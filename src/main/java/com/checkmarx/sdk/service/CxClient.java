@@ -3,7 +3,6 @@ package com.checkmarx.sdk.service;
 import com.checkmarx.sdk.dto.Filter;
 import com.checkmarx.sdk.dto.ScanResults;
 import com.checkmarx.sdk.dto.cx.*;
-import com.checkmarx.sdk.dto.cx.xml.CxXMLResultsType;
 import com.checkmarx.sdk.exception.CheckmarxException;
 import com.checkmarx.sdk.exception.InvalidCredentialsException;
 import org.json.JSONObject;
@@ -84,16 +83,6 @@ public interface CxClient {
      * @throws CheckmarxException
      */
     public ScanResults getReportContent(Integer reportId, List<Filter> filter) throws CheckmarxException;
-
-    /**
-     * Retrieve the xml report by reportId, mapped to ScanResults DTO, applying filtering as requested
-     *
-     * @param reportId
-     * @return
-     * @throws CheckmarxException
-     */
-    public CxXMLResultsType getXmlReportContent(Integer reportId) throws CheckmarxException;
-
 
     /**
      * Returns custom field values read from a Checkmarx project, based on given projectId.
@@ -519,36 +508,6 @@ public interface CxClient {
      * @throws CheckmarxException
      */
     public void deleteScan(Integer scanId) throws CheckmarxException;
-
-    /**
-     * Create a scan based on the CxScanParams and wait for the scan to complete, returning the result XML Jaxb object
-     *
-     * @param params attributes used to define the project
-     * @param comment
-     * @return CxXMLResultType (Jaxb/XML object representation of the scan results)
-     * @throws CheckmarxException
-     */
-    public CxXMLResultsType createScanAndReport(CxScanParams params, String comment) throws CheckmarxException;
-
-    /**
-     * Create a scan based on the CxScanParams and return the ScanResults object based on filters
-     * @param params attributes used to define the project
-     * @param comment
-     * @param filters filters to apply to the scan result set (severity, category, cwe)
-     * @return
-     * @throws CheckmarxException
-     */
-    public ScanResults createScanAndReport(CxScanParams params, String comment, List<Filter> filters) throws CheckmarxException;
-
-    /**
-     * Create a scan based on the CxScanParams and wait for the scan to complete, returning the result XML Jaxb object
-     *
-     * @param teamName
-     * @param projectName
-     * @return
-     * @throws CheckmarxException
-     */
-    public CxXMLResultsType getLatestScanReport(String teamName, String projectName) throws CheckmarxException;
 
     /**
      * Create a scan based on the CxScanParams and return the ScanResults object based on filters

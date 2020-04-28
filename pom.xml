@@ -9,10 +9,10 @@
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>com.github.checkmarx-ts</groupId>
-	<artifactId>cx-spring-boot-sdk</artifactId>
-	<version>0.4.13</version>
-	<name>cx-spring-boot-sdk</name>
-	<description>Checkmarx Java Spring Boot SDK</description>
+	<artifactId>cxod-spring-boot-sdk</artifactId>
+	<version>0.1.0</version>
+	<name>cxod-spring-boot-sdk</name>
+	<description>CxOD Java Spring Boot SDK</description>
 
 	<properties>
 		<java.version>1.8</java.version>
@@ -28,11 +28,6 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-web-services</artifactId>
 		</dependency>
-		<!--dependency>
-			<groupId>com.checkmarx</groupId>
-			<artifactId>cx-client-common</artifactId>
-			<version>8.90.5</version>
-		</dependency-->
 		<dependency>
 			<groupId>org.apache.httpcomponents</groupId>
 			<artifactId>httpclient</artifactId>
@@ -77,10 +72,6 @@
 
 	<build>
 		<plugins>
-			<!--plugin>
-				<groupId>org.springframework.boot</groupId>
-				<artifactId>spring-boot-maven-plugin</artifactId>
-			</plugin-->
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-javadoc-plugin</artifactId>
@@ -209,8 +200,8 @@
 	</licenses>
 
 	<scm>
-		<connection>scm:git:https://github.com/checkmarx-ts/checkmarx-spring-boot-java-sdk.git</connection>
-		<url>https://github.com/checkmarx-ts/checkmarx-spring-boot-java-sdk.git</url>
+		<connection>scm:git:https://github.com/checkmarx-ts/cxod-spring-boot-java-sdk.git</connection>
+		<url>https://github.com/checkmarx-ts/cxod-spring-boot-java-sdk.git</url>
 	</scm>
 
 

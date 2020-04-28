@@ -1,6 +1,5 @@
 package com.checkmarx.sdk.config;
 
-//import com.cx.restclient.httpClient.CxHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -56,21 +55,4 @@ public class CxConfig {
         }
         return ws;
     }
-
-    /*@Bean
-    public CxHttpClient getCxHttpClient() {
-        try {
-            return new CxHttpClient(
-                    properties.getBaseUrl(),
-                    properties.getUsername(),
-                    properties.getPassword(),
-                    "CxFlow",
-                    true,
-                    org.slf4j.LoggerFactory.getLogger(CxHttpClient.class)
-            );
-        }
-        catch (MalformedURLException e){
-            return null;
-        }
-    }*/
 }
