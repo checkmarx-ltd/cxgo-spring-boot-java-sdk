@@ -2,7 +2,6 @@ package com.checkmarx.sdk.dto;
 
 import java.util.List;
 import java.util.Map;
-import checkmarx.wsdl.portal.CxUserTypes;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -48,7 +47,6 @@ public class CxUser {
     @JsonProperty("localeId")
     private Integer localeId;
     private Map<String, String> teams8x; //only used for 8.x SOAP WS
-    private CxUserTypes type8x; //only used for 8.x SOAP WS
     private String company8x; //only used for 8.x SOAP WS
     private String companyId8x; //only used for 8.x SOAP WS
     private String upn; //only used for 8.x SOAP WS
@@ -351,19 +349,6 @@ public class CxUser {
 
     public CxUser withTeams8x(Map<String, String> teams8x) {
         this.teams8x = teams8x;
-        return this;
-    }
-
-    public CxUserTypes getType8x() {
-        return type8x;
-    }
-
-    public void setType8x(CxUserTypes type8x) {
-        this.type8x = type8x;
-    }
-
-    public CxUser withType8x(CxUserTypes type8x) {
-        this.type8x = type8x;
         return this;
     }
 

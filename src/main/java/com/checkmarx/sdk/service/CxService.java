@@ -4,45 +4,15 @@ import com.checkmarx.sdk.config.CxProperties;
 import com.checkmarx.sdk.dto.Filter;
 import com.checkmarx.sdk.dto.ScanResults;
 import com.checkmarx.sdk.dto.cx.*;
-import com.checkmarx.sdk.dto.cx.xml.*;
-import com.checkmarx.sdk.exception.CheckmarxLegacyException;
 import com.checkmarx.sdk.exception.CheckmarxException;
-import com.checkmarx.sdk.config.Constants;
-import com.checkmarx.sdk.exception.InvalidCredentialsException;
-import com.checkmarx.sdk.utils.ScanUtils;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.exception.ExceptionUtils;
-import org.json.JSONArray;
-import org.json.JSONException;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.core.io.FileSystemResource;
-import org.springframework.http.*;
 import org.springframework.stereotype.Service;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
-import javax.naming.InvalidNameException;
-import javax.naming.ldap.LdapName;
-import javax.naming.ldap.Rdn;
-import javax.xml.bind.JAXBContext;
-import javax.xml.bind.JAXBException;
-import javax.xml.bind.UnmarshalException;
-import javax.xml.bind.Unmarshaller;
-import javax.xml.stream.XMLInputFactory;
-import javax.xml.stream.XMLStreamException;
-import javax.xml.stream.XMLStreamReader;
-import java.io.ByteArrayInputStream;
 import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.util.*;
 
 /**
@@ -103,14 +73,12 @@ public class CxService implements CxClient{
     private static final String REPORT_STATUS = "/reports/sastScan/{id}/status";
     private static final String OSA_VULN = "Vulnerable_Library";
     private final CxProperties cxProperties;
-    private final CxLegacyService cxLegacyService;
     private final CxAuthClient authClient;
     private final RestTemplate restTemplate;
 
-    public CxService(CxAuthClient authClient, CxProperties cxProperties, CxLegacyService cxLegacyService, @Qualifier("cxRestTemplate") RestTemplate restTemplate) {
+    public CxService(CxAuthClient authClient, CxProperties cxProperties, @Qualifier("cxRestTemplate") RestTemplate restTemplate) {
         this.authClient = authClient;
         this.cxProperties = cxProperties;
-        this.cxLegacyService = cxLegacyService;
         this.restTemplate = restTemplate;
     }
 
