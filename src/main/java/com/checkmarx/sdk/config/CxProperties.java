@@ -7,7 +7,6 @@ import org.springframework.validation.annotation.Validated;
 
 import javax.annotation.PostConstruct;
 
-
 @Component
 @ConfigurationProperties(prefix = "checkmarx")
 @Validated
@@ -32,7 +31,6 @@ public class CxProperties {
     private String excludeFiles;
     private String excludeFolders;
     private Boolean incremental = false;
-    private Boolean enableOsa = false;
     private String gitClonePath;
     private Integer incrementalThreshold = 7;
     private Integer incrementalNumScans = 5;
@@ -55,6 +53,7 @@ public class CxProperties {
 
     private String portalUrl;
 
+    // TODO:, JeffA this needs to be removed.
     private String portalPackage = "checkmarx.wsdl.portal";
 
     private String htmlStrip = "<style>.cxtaghighlight{color: rgb(101, 170, 235);font-weight:bold;}</style>";
@@ -74,6 +73,7 @@ public class CxProperties {
     public String getClientSecret() {
         return this.clientSecret;
     }
+
 
     public String getBaseUrl() {
         return this.baseUrl;
@@ -243,9 +243,11 @@ public class CxProperties {
         this.portalUrl = portalUrl;
     }
 
+    /*
     public void setPortalPackage(String portalPackage) {
         this.portalPackage = portalPackage;
     }
+    */
 
     public void setHtmlStrip(String htmlStrip) {
         this.htmlStrip = htmlStrip;
@@ -350,10 +352,6 @@ public class CxProperties {
 
     public void setCodeSnippetLength(Integer codeSnippetLength) {
         this.codeSnippetLength = codeSnippetLength;
-    }
-
-    public void setEnableOsa(Boolean enableOsa) {
-        this.enableOsa = enableOsa;
     }
 
     public String getSoapClientId() {
