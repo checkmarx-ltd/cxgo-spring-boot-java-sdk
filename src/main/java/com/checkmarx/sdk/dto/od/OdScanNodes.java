@@ -1,26 +1,25 @@
 package com.checkmarx.sdk.dto.od;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import com.fasterxml.jackson.annotation.JsonAnyGetter;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
         "errors",
         "data"
 })
-public class OdBusinessUnitList {
-
+public class OdScanNodes {
     @JsonProperty("errors")
     private List<Object> errors = null;
     @JsonProperty("data")
-    private BusinessUnitListData data;
+    private OdScanNodeData data;
     @JsonIgnore
     private Map<String, Object> additionalProperties = new HashMap<String, Object>();
 
@@ -35,12 +34,12 @@ public class OdBusinessUnitList {
     }
 
     @JsonProperty("data")
-    public BusinessUnitListData getData() {
+    public OdScanNodeData getData() {
         return data;
     }
 
     @JsonProperty("data")
-    public void setData(BusinessUnitListData data) {
+    public void setData(OdScanNodeData data) {
         this.data = data;
     }
 

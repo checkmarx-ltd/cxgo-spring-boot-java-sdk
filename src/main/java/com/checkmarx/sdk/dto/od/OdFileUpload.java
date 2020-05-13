@@ -25,8 +25,8 @@ public class OdFileUpload {
         this.zipFileName = zipFileName;
     }
 
-    public static com.checkmarx.sdk.dto.od.OdFileUpload.OdFileUploadBuilder builder() {
-        return new com.checkmarx.sdk.dto.od.OdFileUpload.OdFileUploadBuilder();
+    public static OdFileUploadBuilder builder() {
+        return new OdFileUploadBuilder();
     }
 
     public String getProjectId() {
@@ -54,10 +54,6 @@ public class OdFileUpload {
 
         public OdFileUpload build() {
             return new OdFileUpload(projectId, scanId, zipFileName);
-        }
-
-        public String toString() {
-            return "CxScan.CxScanBuilder(projectId=" + this.projectId  + ")";
         }
     }
 }

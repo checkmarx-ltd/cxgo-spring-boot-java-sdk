@@ -15,12 +15,11 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
         "errors",
         "data"
 })
-public class OdBusinessUnitList {
-
+public class OdScanQueries {
     @JsonProperty("errors")
     private List<Object> errors = null;
     @JsonProperty("data")
-    private BusinessUnitListData data;
+    private OdScanQueryData data;
     @JsonIgnore
     private Map<String, Object> additionalProperties = new HashMap<String, Object>();
 
@@ -35,12 +34,12 @@ public class OdBusinessUnitList {
     }
 
     @JsonProperty("data")
-    public BusinessUnitListData getData() {
+    public OdScanQueryData getData() {
         return data;
     }
 
     @JsonProperty("data")
-    public void setData(BusinessUnitListData data) {
+    public void setData(OdScanQueryData data) {
         this.data = data;
     }
 

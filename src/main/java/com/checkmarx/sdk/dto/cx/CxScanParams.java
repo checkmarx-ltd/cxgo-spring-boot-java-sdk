@@ -8,6 +8,8 @@ public class CxScanParams {
     private String teamName;
     private Integer projectId;
     private String projectName;
+    private Integer cxOdAppId;
+    private String cxOdAppName;
     private boolean incremental = false;
     private boolean isPublic = true;
     private boolean forceScan = false;
@@ -159,6 +161,22 @@ public class CxScanParams {
 
     public void setProjectId(Integer projectId) {
         this.projectId = projectId;
+    }
+
+    public Integer getCxOdAppId() {
+        return cxOdAppId;
+    }
+
+    public void setCxOdAppId(Integer cxOdAppId) {
+        this.cxOdAppId = cxOdAppId;
+    }
+
+    public String getCxOdAppName() {
+        return cxOdAppName;
+    }
+
+    public void setCxOdAppName(String cxOdAppName) {
+        this.cxOdAppName = cxOdAppName;
     }
 
     public Integer getScanPresetId() {

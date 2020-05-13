@@ -15,8 +15,8 @@ public class OdScan {
         this.projectId = projectId;
     }
 
-    public static com.checkmarx.sdk.dto.od.OdScan.OdScanBuilder builder() {
-        return new com.checkmarx.sdk.dto.od.OdScan.OdScanBuilder();
+    public static OdScanBuilder builder() {
+        return new OdScanBuilder();
     }
 
     public Integer getProjectId() {
@@ -27,27 +27,19 @@ public class OdScan {
         this.projectId = projectId;
     }
 
-    public String toString() {
-        return "CxScan(projectId=" + this.getProjectId() + ")";
-    }
-
     public static class OdScanBuilder {
         private Integer projectId;
 
         OdScanBuilder() {
         }
 
-        public com.checkmarx.sdk.dto.od.OdScan.OdScanBuilder projectId(Integer projectId) {
+        public OdScanBuilder projectId(Integer projectId) {
             this.projectId = projectId;
             return this;
         }
 
         public com.checkmarx.sdk.dto.od.OdScan build() {
             return new com.checkmarx.sdk.dto.od.OdScan(projectId);
-        }
-
-        public String toString() {
-            return "CxScan.CxScanBuilder(projectId=" + this.projectId  + ")";
         }
     }
 }
