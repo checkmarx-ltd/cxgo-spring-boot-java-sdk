@@ -34,11 +34,18 @@ import java.util.regex.Pattern;
 @Service
 public class CxService implements CxClient{
     private static final String UNKNOWN = "-1";
+
+    private static final Integer SCAN_STATUS_FINISHED = 7;
+    private static final Integer SCAN_STATUS_CANCELED = 8;
+    private static final Integer SCAN_STATUS_FAILED = 9;
+
     /*
     report statuses - there are only 2:
     InProcess (1)
     Created (2)
     */
+
+
     public static final Integer REPORT_STATUS_CREATED = 2;
     private static final Map<String, Integer> STATUS_MAP = ImmutableMap.of(
             "TO VERIFY", 0,
@@ -65,8 +72,9 @@ public class CxService implements CxClient{
     private static final String GET_APPLICATIONS = "/applications/applications";
     private static final String CREATE_PROJECT = "/projects/projects";
     private static final String GET_PROJECTS = "/projects/projects?criteria=%7B%22criteria%22%3A%5B%7B%22key%22%3A%22applicationId%22%2C%22value%22%3A%22{app_id}%22%7D%5D%2C%22pagination%22%3A%7B%22currentPage%22%3A0%2C%22pageSize%22%3A50%7D%2C%22sorting%22%3A%5B%5D%7D";
+    private static final String GET_SCAN_STATUS = "/scans/scans?criteria=%7B%22criteria%22%3A%5B%7B%22key%22%3A%22projectId%22%2C%22value%22%3A%22%7Bproject_id%7D%22%7D%5D%2C%22pagination%22%3A%7B%22currentPage%22%3A0%2C%22pageSize%22%3A50%7D%2C%22sorting%22%3A%5B%5D%7D";
 
-
+    private Integer projectId = -1;
     private final CxProperties cxProperties;
     private final CxAuthClient authClient;
     private final RestTemplate restTemplate;
@@ -178,6 +186,8 @@ public class CxService implements CxClient{
         params.setCxOdAppName(params.getProjectName());
 
         Integer projectID = getProjectId(appID.toString(), "CxFlow");
+// TODO: jeffa, this hack and should be removed.
+this.projectId = projectID;
         if(projectID == -1) {
             projectID = Integer.parseInt(createCxODProject(appID));
         }
@@ -217,6 +227,7 @@ public class CxService implements CxClient{
         OdScanFileUploadFields s3Fields = data.getFields();
         String bucketURL = data.getUrl();
         // Now upload the file to the bucket
+        // TODO: Jeffa, reinsert code to pull code from Repo
         File test = new File("C:\\Users\\JeffA\\Downloads\\testProj.zip");
         //File test = new File("C:\\Users\\JeffA\\Downloads\\dvna-master.zip");
         String s3FilePath = postS3File(bucketURL, "testProj.zip", test, s3Fields);
@@ -287,9 +298,7 @@ public class CxService implements CxClient{
     }
 
     /**
-     * Finds the Business Unit ID
-     *
-     * NOTE: this has a potential non-deterministic state that could occur if separate BU's have the same name.
+     * Searches the navigation tree for the Business Unit.
      *
      * @param teamPath
      * @return the Business Unit ID or -1
@@ -297,31 +306,79 @@ public class CxService implements CxClient{
      */
     @Override
     public String getTeamId(String teamPath) throws CheckmarxException {
-        try {
-            String [] buTokens = teamPath.split(Pattern.quote("\\"));
-            String buName = buTokens[buTokens.length -1];
-            List<BusinessUnitListEntry> businessUnits = getBusinessUnits();
-            if(businessUnits == null) {
-                throw new CheckmarxException("Error obtaining Business Unit Id");
-            }
-            for(BusinessUnitListEntry businessUnit : businessUnits) {
-                if(businessUnit.getName().equals(buName)) {
-                    log.info("Found team {} with ID {}", teamPath, businessUnit.getId());
-                    return businessUnit.getId().toString();
+        String []buTokens = teamPath.split(Pattern.quote("\\"));
+        OdNavigationTree navTree = getNavigationTree();
+        LinkedHashMap<String, ArrayList<Object>> navTreeData = (LinkedHashMap) navTree.getAdditionalProperties().get("data");
+        ArrayList<LinkedHashMap<String, LinkedHashMap<String, Object>>> tree = (ArrayList) navTreeData.get("tree");
+        int i = 1;
+        String token = buTokens[i++];
+        for(LinkedHashMap<String, LinkedHashMap<String, Object>> item : tree) {
+            Object o = item.get("id");
+            Integer id = (Integer)o;
+            o = item.get("title");
+            String title = (String) o;
+            o = item.get("children");
+            ArrayList<Object> children = (ArrayList<Object>) o;
+            if(title.equals(token)) {
+                if(i == buTokens.length) {
+                    return id.toString();
+                } else {
+                    return searchTreeChildren(buTokens, i, children);
                 }
             }
-        } catch(HttpStatusCodeException e) {
-            log.error("Error occurred while retrieving Teams");
-            log.error(ExceptionUtils.getStackTrace(e));
         }
-        log.info("No Business Unit was found for {}", teamPath);
         return UNKNOWN;
     }
 
-    private List<BusinessUnitListEntry> getBusinessUnits() throws CheckmarxException {
+    private String searchTreeChildren(String []buTokens, int i, ArrayList<Object> children) {
+        String token = buTokens[i++];
+        for(Object item : children) {
+            LinkedHashMap<String, Object> node = (LinkedHashMap<String, Object>)item;
+            Object o = node.get("id");
+            Integer id = (Integer) o;
+            o = node.get("title");
+            String title = (String)o;
+            o = node.get("children");
+            ArrayList<Object> nodeChildren = (ArrayList<Object>)o;
+            if(title.equals(token)) {
+                if(i == buTokens.length) {
+                    return id.toString();
+                } else {
+                    return searchTreeChildren(buTokens, i, children);
+                }
+            }
+        }
+        return UNKNOWN;
+    }
+
+    @Override
+    public String getTeamId(String parentTeamId, String teamName) throws CheckmarxException {
+        return UNKNOWN;
+    }
+
+    private OdNavigationTree getNavigationTree() throws CheckmarxException {
+        HttpEntity httpEntity = new HttpEntity<>(authClient.createAuthHeaders());
+        try {
+            log.info("Retrieving OD Navigation Tree");
+            ResponseEntity<OdNavigationTree> response = restTemplate.exchange(
+                    cxProperties.getUrl().concat("/navigation-tree/navigation-tree"),
+                    HttpMethod.GET,
+                    httpEntity,
+                    OdNavigationTree.class);
+            OdNavigationTree tree = response.getBody();
+            return tree;
+        } catch(HttpStatusCodeException e) {
+            log.error("Error occurred while retrieving the navigation tree.");
+            log.error(ExceptionUtils.getStackTrace(e));
+            throw new CheckmarxException("Error retrieving Business Units.");
+        }
+    }
+
+    private List<BusinessUnitListEntry> getBusinessUnits(String parentID) throws CheckmarxException {
         HttpEntity httpEntity = new HttpEntity<>(authClient.createAuthHeaders());
         try {
             log.info("Retrieving OD Business Units");
+            // /business-units/business-units
             ResponseEntity<OdBusinessUnitList> response = restTemplate.exchange(
                     cxProperties.getUrl().concat(TEAMS),
                     HttpMethod.GET,
@@ -556,17 +613,56 @@ public class CxService implements CxClient{
         return -1;
     }
 
-    @Override
     public void waitForScanCompletion(Integer scanId) throws CheckmarxException {
-
+        Integer status = getScanStatus(projectId, scanId);
+        long timer = 0;
+        try {
+            while(!status.equals(CxService.SCAN_STATUS_FINISHED) &&
+                    !status.equals(CxService.SCAN_STATUS_CANCELED) &&
+                    !status.equals(CxService.SCAN_STATUS_FAILED)) {
+                Thread.sleep(cxProperties.getScanPolling());
+                status = getScanStatus(projectId, scanId);
+                timer += cxProperties.getScanPolling();
+                if(timer >= (cxProperties.getScanTimeout() * 60000)) {
+                    log.error("Scan timeout exceeded.  {} minutes", cxProperties.getScanTimeout());
+                    throw new CheckmarxException("Timeout exceeded during scan");
+                }
+            }
+        } catch(InterruptedException e) {
+            log.error("Thread sleep error waiting for scan status!");
+        }
+        if (status.equals(CxService.SCAN_STATUS_FAILED) || status.equals(CxService.SCAN_STATUS_CANCELED)) {
+            throw new CheckmarxException("Scan was cancelled or failed");
+        }
     }
 
-
+    public Integer getScanStatus(Integer projectId, Integer scanId) {
+        log.info("Retrieving OD Scan List");
+        HttpEntity httpEntity = new HttpEntity<>(authClient.createAuthHeaders());
+        ResponseEntity<OdScanList> response = restTemplate.exchange(
+                cxProperties.getUrl().concat(GET_SCAN_STATUS),
+                HttpMethod.GET,
+                httpEntity,
+                OdScanList.class,
+                projectId);
+        OdScanList appList = response.getBody();
+        for(OdScanListDataItem item : appList.getData().getItems()) {
+            if(item.getId() == scanId && item.getStatus().equals("Done")) {
+                return SCAN_STATUS_FINISHED;
+            }
+        }
+        return -1;
+    }
 
     //
     /// I think things below here should be removed the public interface. They are specific
     /// Cx SAST.
     //
+    @Override
+    public Integer getScanStatus(Integer scanId) {
+        return 0;
+    }
+
     @Override
     public Integer getLastScanId(Integer projectId) {
         return null;
@@ -579,11 +675,6 @@ public class CxService implements CxClient{
 
     @Override
     public LocalDateTime getLastScanDate(Integer projectId) {
-        return null;
-    }
-
-    @Override
-    public Integer getScanStatus(Integer scanId) {
         return null;
     }
 
@@ -780,11 +871,6 @@ public class CxService implements CxClient{
     @Override
     public void deleteTeam(String teamId) throws CheckmarxException {
 
-    }
-
-    @Override
-    public String getTeamId(String parentTeamId, String teamName) throws CheckmarxException {
-        return null;
     }
 
     @Override

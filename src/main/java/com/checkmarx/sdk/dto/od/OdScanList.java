@@ -2,39 +2,40 @@ package com.checkmarx.sdk.dto.od;
 
 import com.fasterxml.jackson.annotation.*;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
-        "id",
-        "name"
+        "errors",
+        "data"
 })
-public class OdProjectListDataItem {
-    @JsonProperty("id")
-    private Integer id;
-    @JsonProperty("name")
-    private String name;
+public class OdScanList {
+    @JsonProperty("errors")
+    private List<Object> errors = null;
+    @JsonProperty("data")
+    private OdScanListData data;
     @JsonIgnore
     private Map<String, Object> additionalProperties = new HashMap<String, Object>();
 
-    @JsonProperty("id")
-    public Integer getId() {
-        return id;
+    @JsonProperty("errors")
+    public List<Object> getErrors() {
+        return errors;
     }
 
-    @JsonProperty("id")
-    public void setId(Integer id) {
-        this.id = id;
+    @JsonProperty("errors")
+    public void setErrors(List<Object> errors) {
+        this.errors = errors;
     }
 
-    @JsonProperty("name")
-    public String getName() {
-        return name;
+    @JsonProperty("data")
+    public OdScanListData getData() {
+        return data;
     }
 
-    @JsonProperty("name")
-    public void setName(String name) {
-        this.name = name;
+    @JsonProperty("data")
+    public void setData(OdScanListData data) {
+        this.data = data;
     }
 
     @JsonAnyGetter
