@@ -16,7 +16,7 @@ public interface CxAuthClient {
      * @param password
      * @param clientId
      * @param clientSecret
-     * @return
+     * @return auth token
      */
     public String getAuthToken(String username, String password, String clientId, String clientSecret, String scope) throws InvalidCredentialsException;
 
@@ -25,7 +25,7 @@ public interface CxAuthClient {
      *
      * @param username
      * @param password
-     * @return
+     * @return soap auth token
      */
     public String getSoapAuthToken(String username, String password) throws InvalidCredentialsException;
 
@@ -34,7 +34,7 @@ public interface CxAuthClient {
      *
      * @param username
      * @param password
-     * @return
+     * @return login name
      * @throws InvalidCredentialsException
      */
     public String legacyLogin(String username, String password) throws InvalidCredentialsException;
@@ -42,7 +42,7 @@ public interface CxAuthClient {
     /**
      * Create REST API Headers for Authentication (JWT/OIDC)
      *
-     * @return
+     * @return AuthHeaders for API calls
      */
     public HttpHeaders createAuthHeaders();
 

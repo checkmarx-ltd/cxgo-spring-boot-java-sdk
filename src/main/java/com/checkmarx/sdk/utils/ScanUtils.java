@@ -38,7 +38,7 @@ public class ScanUtils {
      *
      * @param list
      * @param value - extension of file, or full filename
-     * @return
+     * @return true if filename is present
      */
     protected static boolean fileListContains(List<String> list, String value){
         for(String s: list){
@@ -52,7 +52,7 @@ public class ScanUtils {
     /**
      * Check if string is empty or null
      * @param str
-     * @return
+     * @return true if string is empty
      */
     public static boolean empty(String str) {
         return str == null || str.isEmpty();
@@ -68,7 +68,7 @@ public class ScanUtils {
     /**
      * Check if list is empty or null
      * @param list
-     * @return
+     * @return True if the list is empty
      */
     public static boolean empty(List list) {
         if (list == null) {
