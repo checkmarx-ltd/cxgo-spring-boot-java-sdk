@@ -39,11 +39,21 @@ public class CxService implements CxClient{
     private static final Integer SCAN_STATUS_CANCELED = 8;
     private static final Integer SCAN_STATUS_FAILED = 9;
 
-    /*
-    report statuses - there are only 2:
-    InProcess (1)
-    Created (2)
-    */
+    //
+    /// Scan Preset Definitions
+    //
+    public static final Integer CXOD_MOBILE_NATIVE = 1;
+    public static final Integer CXOD_MOBILE_WEB_BASED = 2;
+    public static final Integer CXOD_DESKTOP_NATIVE = 3;
+    public static final Integer CXOD_DESKTOP_WEB = 4;
+    public static final Integer CXOD_API = 5;
+    public static final Integer CXOD_FRONTEND = 6;
+    public static final Integer CXOD_BACKEND = 7;
+    public static final Integer CXOD_LAMBDA = 8;
+    public static final Integer CXOD_CLI = 9;
+    public static final Integer CXOD_SERVICE = 10;
+    public static final Integer CXOD_SMART_DEVICE = 11;
+    public static final Integer CXOD_OTHER = 12;
 
 
     public static final Integer REPORT_STATUS_CREATED = 2;
@@ -144,9 +154,11 @@ public class CxService implements CxClient{
             createBody.put("businessApplicationId", appId);
             createBody.put("name", projectName);
             createBody.put("description", "");
+            String preset = cxProperties.getScanPreset();
+            String [] jd = preset.split(",");
             // TODO: Jeffa, modify the typeIds to be project specific
             int typeList[] = new int[]{1,2};
-            createBody.put("typeIds", typeList);
+            createBody.put("typeIds", jd);
             createBody.put("criticality", 5);
             requestBody.put("project", createBody);
         } catch (JSONException e) {
@@ -157,9 +169,9 @@ public class CxService implements CxClient{
 
     @Override
     public Integer createScan(CxScanParams params, String comment) throws CheckmarxException {
-        // TODO: jeffa, verify if I can removed this where the tickets are being cut
-        //params.setCxOdAppId(appID);
-        //params.setCxOdAppName(params.getProjectName());
+        //
+        /// Create the project if it doesn't exist.
+        //
         String appID = params.getTeamId();
         Integer projectID = getProjectId(appID, params.getProjectName());
         if(projectID == -1) {
@@ -211,9 +223,17 @@ public class CxService implements CxClient{
         log.info("CxOD Triggering the scan {}.", scanId);
         List<String> typeIds = new LinkedList<>();
         // TODO: jeffa, this needs to be updated to pick the correct presets
-        typeIds.add("1");
-        typeIds.add("2");
-        typeIds.add("9");
+        //typeIds.add("1");
+        //typeIds.add("2");
+        //typeIds.add("3");
+        //typeIds.add("4");
+        //typeIds.add("5");
+        //typeIds.add("6");
+        //typeIds.add("9");
+
+        int typeList[] = new int[]{1,2};
+        //createBody.put("typeIds", typeList);
+
         OdScanTrigger scanTrigger = OdScanTrigger.builder()
                 .projectId(params.getProjectId().toString(), scanId, s3FilePath, typeIds)
                 .build();
@@ -346,25 +366,6 @@ public class CxService implements CxClient{
         }
     }
 
-    private List<BusinessUnitListEntry> getBusinessUnits(String parentID) throws CheckmarxException {
-        HttpEntity httpEntity = new HttpEntity<>(authClient.createAuthHeaders());
-        try {
-            log.info("Retrieving OD Business Units");
-            // /business-units/business-units
-            ResponseEntity<OdBusinessUnitList> response = restTemplate.exchange(
-                    cxProperties.getUrl().concat(TEAMS),
-                    HttpMethod.GET,
-                    httpEntity,
-                    OdBusinessUnitList.class);
-            OdBusinessUnitList businessUnits = response.getBody();
-            return businessUnits.getData().getItems();
-        } catch(HttpStatusCodeException e) {
-            log.error("Error occurred while retrieving Business units.");
-            log.error(ExceptionUtils.getStackTrace(e));
-            throw new CheckmarxException("Error retrieving Business Units.");
-        }
-    }
-
     @Override
     public String createTeam(String parentID, String teamName) throws CheckmarxException {
         //return createCxODBusinessUnit(parentID, teamName);
@@ -405,11 +406,9 @@ public class CxService implements CxClient{
 
     @Override
     public ScanResults getReportContentByScanId(Integer scanId, List<Filter> filter) throws CheckmarxException {
-        // Rigged to use Luis Tavares/JJ
         ScanResults.ScanResultsBuilder scanResults = ScanResults.builder();
-        //getScanQueries(scanResults,119, 124);
-        // TODO: jeffa, we need to the scan summary data
-        getScanQueries(scanResults,10006, 10053);
+        Integer projectId = scanIdMap.get(scanId.toString());
+        getScanQueries(scanResults, projectId, scanId);
         return scanResults.build();
     }
 
@@ -612,7 +611,6 @@ public class CxService implements CxClient{
     public Integer getScanStatus(Integer projectId, Integer scanId) {
         log.info("Retrieving OD Scan List");
         HttpEntity httpEntity = new HttpEntity<>(authClient.createAuthHeaders());
-        // OdScanList
         ResponseEntity<OdScanList> response = restTemplate.exchange(
                 cxProperties.getUrl().concat(GET_SCAN_STATUS),
                 HttpMethod.GET,
