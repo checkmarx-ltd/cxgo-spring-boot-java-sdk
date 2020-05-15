@@ -63,18 +63,16 @@ public class CxService implements CxClient{
     private static final String UPLOADS_SCAN_FILE = "/files/files/upload-zip";
     private static final String TRIGGER_SCAN = "/scans/scan";
     private static final String SCAN_QUERIES = "/projects/projects/{project_id}/scans/{scan_id}/queries";
-    private static final String SCAN_RESULTS = "/results/results?criteria={\"filters\":[],\"criteria\":[{\"key\":\"projectId\",\"value\":\"{project_id}\"},{\"key\":\"scanId\",\"value\":\"{scan_id}\"},{\"key\":\"queryId\",\"value\":\"{query_id}\"}],\"sorting\":[],\"pagination\":{\"currentPage\":0,\"pageSize\":50}}";
     private static final String SCAN_RESULTS_ENCODED = "/results/results?criteria=%7B%22filters%22%3A%5B%5D%2C%22criteria%22%3A%5B%7B%22key%22%3A%22projectId%22%2C%22value%22%3A%22{project_id}%22%7D%2C%7B%22key%22%3A%22scanId%22%2C%22value%22%3A%22{scan_id}%22%7D%2C%7B%22key%22%3A%22queryId%22%2C%22value%22%3A%22{query_id}%22%7D%5D%2C%22sorting%22%3A%5B%5D%2C%22pagination%22%3A%7B%22currentPage%22%3A0%2C%22pageSize%22%3A50%7D%7D";
-    private static final String SCAN_RESULT_NODES = "/nodes/nodes?criteria={\"criteria\":[{\"key\":\"projectId\",\"value\":\"{project_id}\"},{\"key\":\"scanId\",\"value\":\"scan_id\"},{\"key\":\"resultId\",\"value\":\"result_id\"}],\"sorting\":[]}";
     private static final String SCAN_RESULT_NODES_ENCODED = "/nodes/nodes?criteria=%7B%22criteria%22%3A%5B%7B%22key%22%3A%22projectId%22%2C%22value%22%3A%22{project_id}%22%7D%2C%7B%22key%22%3A%22scanId%22%2C%22value%22%3A%22{scan_id}%22%7D%2C%7B%22key%22%3A%22resultId%22%2C%22value%22%3A%22{result_id}%22%7D%5D%2C%22sorting%22%3A%5B%5D%7D";
     private static final String SCAN_FILE = "/projects/projects/{project_id}/scans/{scan_id}/files?filePath={file_path};";
     private static final String CREATE_APPLICATION = "/applications/applications";
-    private static final String GET_APPLICATIONS = "/applications/applications";
     private static final String CREATE_PROJECT = "/projects/projects";
     private static final String GET_PROJECTS = "/projects/projects?criteria=%7B%22criteria%22%3A%5B%7B%22key%22%3A%22applicationId%22%2C%22value%22%3A%22{app_id}%22%7D%5D%2C%22pagination%22%3A%7B%22currentPage%22%3A0%2C%22pageSize%22%3A50%7D%2C%22sorting%22%3A%5B%5D%7D";
-    private static final String GET_SCAN_STATUS = "/scans/scans?criteria=%7B%22criteria%22%3A%5B%7B%22key%22%3A%22projectId%22%2C%22value%22%3A%22%7Bproject_id%7D%22%7D%5D%2C%22pagination%22%3A%7B%22currentPage%22%3A0%2C%22pageSize%22%3A50%7D%2C%22sorting%22%3A%5B%5D%7D";
+    private static final String GET_SCAN_STATUS = "/scans/scans?criteria=%7B%22criteria%22%3A%5B%7B%22key%22%3A%22projectId%22%2C%22value%22%3A%22{project_id}%22%7D%5D%2C%22pagination%22%3A%7B%22currentPage%22%3A0%2C%22pageSize%22%3A50%7D%2C%22sorting%22%3A%5B%5D%7D";
 
-    private Integer projectId = -1;
+    private static Map<String, Integer> scanIdMap = new HashMap();
+
     private final CxProperties cxProperties;
     private final CxAuthClient authClient;
     private final RestTemplate restTemplate;
@@ -157,44 +155,16 @@ public class CxService implements CxClient{
         return requestBody.toString();
     }
 
-    // TODO: jeffa, remove this after verifying code is working
-    private Integer doesApplicationExist(String appName) {
-        HttpEntity httpEntity = new HttpEntity<>(authClient.createAuthHeaders());
-        log.info("Retrieving OD Applications");
-        ResponseEntity<OdApplicationList> response = restTemplate.exchange(
-                    cxProperties.getUrl().concat(GET_APPLICATIONS),
-                    HttpMethod.GET,
-                    httpEntity,
-                OdApplicationList.class);
-        OdApplicationList appList = response.getBody();
-        for(OdApplicationListDataItem item : appList.getData().getItems()) {
-            if(item.getName().equals(appName)) {
-                return item.getId();
-            }
-        }
-        return -1;
-    }
-
     @Override
     public Integer createScan(CxScanParams params, String comment) throws CheckmarxException {
-        /*
-        Integer appID = doesApplicationExist(params.getProjectName());
-        if(appID == -1) {
-            appID = Integer.parseInt(createApplication(params.getProjectName(),
-                    "CxFlow Application",
-                    params.getTeamId()));
-        }
-        */
+        // TODO: jeffa, verify if I can removed this where the tickets are being cut
         //params.setCxOdAppId(appID);
         //params.setCxOdAppName(params.getProjectName());
         String appID = params.getTeamId();
-
         Integer projectID = getProjectId(appID, params.getProjectName());
         if(projectID == -1) {
             projectID = Integer.parseInt(createCxODProject(appID, params.getProjectName()));
         }
-// TODO: jeffa, this hack and should be removed.
-this.projectId = projectID;
         params.setProjectId(projectID);
         //
         /// First, the scan needs to be started
@@ -232,8 +202,8 @@ this.projectId = projectID;
         String bucketURL = data.getUrl();
         // Now upload the file to the bucket
         // TODO: Jeffa, reinsert code to pull code from Repo
-        File test = new File("C:\\Users\\JeffA\\Downloads\\testProj.zip");
-        //File test = new File("C:\\Users\\JeffA\\Downloads\\dvna-master.zip");
+        //File test = new File("C:\\Users\\JeffA\\Downloads\\testProj.zip");
+        File test = new File("C:\\Users\\JeffA\\Downloads\\dvna-master.zip");
         String s3FilePath = postS3File(bucketURL, "testProj.zip", test, s3Fields);
         //
         /// Finally the scan is kicked off
@@ -255,6 +225,7 @@ this.projectId = projectID;
                 OdScanTriggerResult.class);
         // There is currently no use for the triggerResult!
         OdScanTriggerResult triggerResult = triggerResp.getBody();
+        scanIdMap.put(scanId, projectID);
         return Integer.parseInt(scanId);
     }
 
@@ -357,11 +328,6 @@ this.projectId = projectID;
         return UNKNOWN;
     }
 
-    @Override
-    public String getTeamId(String parentTeamId, String teamName) throws CheckmarxException {
-        return UNKNOWN;
-    }
-
     private OdNavigationTree getNavigationTree() throws CheckmarxException {
         HttpEntity httpEntity = new HttpEntity<>(authClient.createAuthHeaders());
         try {
@@ -401,8 +367,8 @@ this.projectId = projectID;
 
     @Override
     public String createTeam(String parentID, String teamName) throws CheckmarxException {
-        return createApplication(teamName, "Generated by CxFlow", parentID);
         //return createCxODBusinessUnit(parentID, teamName);
+        return createApplication(teamName, "Generated by CxFlow", parentID);
     }
 
     private String createCxODBusinessUnit(String parentID, String teamName) {
@@ -620,6 +586,7 @@ this.projectId = projectID;
     }
 
     public void waitForScanCompletion(Integer scanId) throws CheckmarxException {
+        Integer projectId = scanIdMap.get(scanId.toString());
         Integer status = getScanStatus(projectId, scanId);
         long timer = 0;
         try {
@@ -645,6 +612,7 @@ this.projectId = projectID;
     public Integer getScanStatus(Integer projectId, Integer scanId) {
         log.info("Retrieving OD Scan List");
         HttpEntity httpEntity = new HttpEntity<>(authClient.createAuthHeaders());
+        // OdScanList
         ResponseEntity<OdScanList> response = restTemplate.exchange(
                 cxProperties.getUrl().concat(GET_SCAN_STATUS),
                 HttpMethod.GET,
@@ -664,6 +632,11 @@ this.projectId = projectID;
     /// I think things below here should be removed the public interface. They are specific
     /// Cx SAST.
     //
+    @Override
+    public String getTeamId(String parentTeamId, String teamName) throws CheckmarxException {
+        return UNKNOWN;
+    }
+
     @Override
     public Integer getScanStatus(Integer scanId) {
         return 0;
