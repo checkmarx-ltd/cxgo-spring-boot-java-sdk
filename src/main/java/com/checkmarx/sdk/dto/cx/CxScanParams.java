@@ -8,7 +8,7 @@ public class CxScanParams {
     private String teamName;
     private Integer projectId;
     private String projectName;
-    private Integer cxOdAppId;
+    private String cxOdAppId;
     private String cxOdAppName;
     private boolean incremental = false;
     private boolean isPublic = true;
@@ -163,11 +163,11 @@ public class CxScanParams {
         this.projectId = projectId;
     }
 
-    public Integer getCxOdAppId() {
+    public String getCxOdAppId() {
         return cxOdAppId;
     }
 
-    public void setCxOdAppId(Integer cxOdAppId) {
+    public void setCxOdAppId(String cxOdAppId) {
         this.cxOdAppId = cxOdAppId;
     }
 
