@@ -1,5 +1,6 @@
 package com.checkmarx.sdk.service;
 
+import com.checkmarx.sdk.utils.ZipUtils;
 import com.checkmarx.sdk.config.CxProperties;
 import com.checkmarx.sdk.dto.Filter;
 import com.checkmarx.sdk.dto.ScanResults;
@@ -20,6 +21,8 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.errors.GitAPIException;
 
 import java.io.*;
 import java.net.URI;
@@ -40,7 +43,7 @@ public class CxService implements CxClient{
     private static final Integer SCAN_STATUS_FAILED = 9;
 
     //
-    /// Scan Preset Definitions
+    /// Scan Preset Definitions for reference
     //
     public static final Integer CXOD_MOBILE_NATIVE = 1;
     public static final Integer CXOD_MOBILE_WEB_BASED = 2;
@@ -155,10 +158,8 @@ public class CxService implements CxClient{
             createBody.put("name", projectName);
             createBody.put("description", "");
             String preset = cxProperties.getScanPreset();
-            String [] jd = preset.split(",");
-            // TODO: Jeffa, modify the typeIds to be project specific
-            int typeList[] = new int[]{1,2};
-            createBody.put("typeIds", jd);
+            String [] presets = preset.split(",");
+            createBody.put("typeIds", presets);
             createBody.put("criticality", 5);
             requestBody.put("project", createBody);
         } catch (JSONException e) {
@@ -213,29 +214,21 @@ public class CxService implements CxClient{
         OdScanFileUploadFields s3Fields = data.getFields();
         String bucketURL = data.getUrl();
         // Now upload the file to the bucket
-        // TODO: Jeffa, reinsert code to pull code from Repo
+        // Lines commented out are hack for a local file for quick testing
         //File test = new File("C:\\Users\\JeffA\\Downloads\\testProj.zip");
-        File test = new File("C:\\Users\\JeffA\\Downloads\\dvna-master.zip");
-        String s3FilePath = postS3File(bucketURL, "testProj.zip", test, s3Fields);
+        //File test = new File("C:\\Users\\JeffA\\Downloads\\dvna-master.zip");
+        File test = new File(prepareRepoFile(params.getGitUrl(), params.getBranch()));
+        //String s3FilePath = postS3File(bucketURL, "testProj.zip", test, s3Fields);
+        String s3FilePath = postS3File(bucketURL, "archive.zip", test, s3Fields);
+        prepareRepoFile(params.getGitUrl(), params.getBranch());
         //
         /// Finally the scan is kicked off
         //
         log.info("CxOD Triggering the scan {}.", scanId);
-        List<String> typeIds = new LinkedList<>();
-        // TODO: jeffa, this needs to be updated to pick the correct presets
-        //typeIds.add("1");
-        //typeIds.add("2");
-        //typeIds.add("3");
-        //typeIds.add("4");
-        //typeIds.add("5");
-        //typeIds.add("6");
-        //typeIds.add("9");
-
-        int typeList[] = new int[]{1,2};
-        //createBody.put("typeIds", typeList);
-
+        String preset = cxProperties.getScanPreset();
+        String []presets = preset.split(",");
         OdScanTrigger scanTrigger = OdScanTrigger.builder()
-                .projectId(params.getProjectId().toString(), scanId, s3FilePath, typeIds)
+                .projectId(params.getProjectId().toString(), scanId, s3FilePath, presets)
                 .build();
         httpEntity = new HttpEntity<>(scanTrigger, headers);
         ResponseEntity<OdScanTriggerResult> triggerResp = restTemplate.exchange(
@@ -247,6 +240,29 @@ public class CxService implements CxClient{
         OdScanTriggerResult triggerResult = triggerResp.getBody();
         scanIdMap.put(scanId, projectID);
         return Integer.parseInt(scanId);
+    }
+
+    private String prepareRepoFile(String gitURL, String branch) throws CheckmarxException {
+        String srcPath;
+        File pathFile = null;
+        srcPath = cxProperties.getGitClonePath().concat("/").concat(UUID.randomUUID().toString());
+        pathFile = new File(srcPath);
+        try {
+            log.info("Cloning code locally to {}", pathFile);
+            Git.cloneRepository()
+                    .setURI(gitURL)
+                    .setBranch(branch)
+                    .setBranchesToClone(Collections.singleton(branch))
+                    .setDirectory(pathFile)
+                    .call();
+            String cxZipFile = cxProperties.getGitClonePath().concat("/").concat("cx.".concat(UUID.randomUUID().toString()).concat(".zip"));
+            //ZipUtils.zipFile(srcPath, cxZipFile, flowProperties.getZipExclude());
+            // TODO: Jeffa, enable the eclude option.
+            ZipUtils.zipFile(srcPath, cxZipFile, null);
+            return cxZipFile;
+        } catch(GitAPIException | IOException e) {
+            throw new CheckmarxException("Unable to clone Git Url.");
+        }
     }
 
     private String postS3File(String targetURL, String filename, File file, OdScanFileUploadFields s3Fields) {
@@ -429,6 +445,10 @@ public class CxService implements CxClient{
             summarizeSeverity(scanSummary, item);
             ScanResults.XIssue.XIssueBuilder xib = ScanResults.XIssue.builder();
             String testURL = cxProperties.getUrl().concat("/scan/business-unit/76/application/10001/project/10006/scans/10088");
+            // TODO: jeffa, the hard coded address needs removed
+            // We also need the current BU and application ID somehow
+            testURL = "https://cloud.checkmarx.net/scan/business-unit/3/application/10/project/%s/scans/%s";
+            String.format(testURL, projectId, scanId);
             xib.link(testURL);
             xib.language(item.getLanguage());
             for(OdScanQueryCategory vulnerability : item.getCategories()) {
@@ -441,8 +461,16 @@ public class CxService implements CxClient{
                 }
             }
         }
+        // TODO: Jeffa, I think I can remove the scan summary stuff -- its in additional details
         scanResults.scanSummary(scanSummary);
         scanResults.xIssues(xIssueList);
+        Map<String, Object> additionalDetails = new HashMap();
+        Map<String, Integer> scanDetails = new HashMap();
+        scanDetails.put("High", scanSummary.getHighSeverity());
+        scanDetails.put("Medium", scanSummary.getMediumSeverity());
+        scanDetails.put("Low", scanSummary.getLowSeverity());
+        additionalDetails.put("flow-summary", scanDetails);
+        scanResults.additionalDetails(additionalDetails);
     }
 
     private void summarizeSeverity(CxScanSummary scanSummary, OdScanQueryItem vulnerability) {
@@ -621,6 +649,8 @@ public class CxService implements CxClient{
         for(OdScanListDataItem item : appList.getData().getItems()) {
             if(item.getId() == scanId && item.getStatus().equals("Done")) {
                 return SCAN_STATUS_FINISHED;
+            } else if(item.getId() == scanId && item.getStatus().equals("Project sources scan failed")) {
+                return SCAN_STATUS_FAILED;
             }
         }
         return -1;

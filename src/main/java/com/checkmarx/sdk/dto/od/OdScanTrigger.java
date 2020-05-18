@@ -22,10 +22,10 @@ public class OdScanTrigger {
     public String s3FilePath;
 
     @JsonProperty("typeIds")
-    public List<String> typeIds;
+    public String [] typeIds;
 
     @java.beans.ConstructorProperties({"projectId", "scanId", "s3FilePath", "typeIds"})
-    OdScanTrigger(String projectId, String scanId, String s3FilePath, List<String> typeIds) {
+    OdScanTrigger(String projectId, String scanId, String s3FilePath, String [] typeIds) {
         this.projectId = projectId;
         this.scanId = scanId;
         this.s3FilePath = s3FilePath;
@@ -48,12 +48,15 @@ public class OdScanTrigger {
         private String projectId;
         private String scanId;
         private String s3FilePath;
-        private List<String> typeIds;
+        private String [] typeIds;
 
         OdScanTriggerBuilder() {
         }
 
-        public OdScanTriggerBuilder projectId(String projectId, String scanId, String s3FilePath, List<String> typeIds) {
+        public OdScanTriggerBuilder projectId(String projectId,
+                                              String scanId,
+                                              String s3FilePath,
+                                              String []typeIds) {
             this.projectId = projectId;
             this.scanId = scanId;
             this.s3FilePath = s3FilePath;
