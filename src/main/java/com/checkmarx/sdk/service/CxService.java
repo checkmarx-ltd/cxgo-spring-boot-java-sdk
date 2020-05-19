@@ -425,6 +425,7 @@ public class CxService implements CxClient{
         CxScanParams params = scanIdMap.get(scanId.toString());
         Integer projectId = params.getProjectId();
         getScanQueries(scanResults, projectId, scanId, filter);
+        scanResults.projectId(projectId.toString());
         return scanResults.build();
     }
 
