@@ -216,7 +216,12 @@ public class CxService implements CxClient{
         OdScanFileUploadFields s3Fields = data.getFields();
         String bucketURL = data.getUrl();
         // Now, upload the file to the bucket
-        File archive = new File(prepareRepoFile(params.getGitUrl(), params.getBranch()));
+        File archive = null;
+        if(params.getSourceType() == CxScanParams.Type.FILE) {
+            archive = new File(params.getFilePath());
+        } else {
+            archive = new File(prepareRepoFile(params.getGitUrl(), params.getBranch()));
+        }
         String s3FilePath = postS3File(bucketURL, "archive.zip", archive, s3Fields);
         FileSystemUtils.deleteRecursively(archive);
         //
