@@ -8,6 +8,7 @@ import com.checkmarx.sdk.dto.cx.*;
 import com.checkmarx.sdk.dto.od.*;
 import com.checkmarx.sdk.exception.CheckmarxException;
 import com.google.common.collect.ImmutableMap;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -16,6 +17,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
+import org.springframework.util.FileSystemUtils;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.HttpClientErrorException;
@@ -213,14 +215,10 @@ public class CxService implements CxClient{
         OdScanFileUploadData data = scanUpload.getData();
         OdScanFileUploadFields s3Fields = data.getFields();
         String bucketURL = data.getUrl();
-        // Now upload the file to the bucket
-        // Lines commented out are hack for a local file for quick testing
-        //File test = new File("C:\\Users\\JeffA\\Downloads\\testProj.zip");
-        //File test = new File("C:\\Users\\JeffA\\Downloads\\dvna-master.zip");
-        File test = new File(prepareRepoFile(params.getGitUrl(), params.getBranch()));
-        //String s3FilePath = postS3File(bucketURL, "testProj.zip", test, s3Fields);
-        String s3FilePath = postS3File(bucketURL, "archive.zip", test, s3Fields);
-        prepareRepoFile(params.getGitUrl(), params.getBranch());
+        // Now, upload the file to the bucket
+        File archive = new File(prepareRepoFile(params.getGitUrl(), params.getBranch()));
+        String s3FilePath = postS3File(bucketURL, "archive.zip", archive, s3Fields);
+        FileSystemUtils.deleteRecursively(archive);
         //
         /// Finally the scan is kicked off
         //
@@ -254,11 +252,13 @@ public class CxService implements CxClient{
                     .setBranch(branch)
                     .setBranchesToClone(Collections.singleton(branch))
                     .setDirectory(pathFile)
-                    .call();
+                    .call()
+                    .close();
             String cxZipFile = cxProperties.getGitClonePath().concat("/").concat("cx.".concat(UUID.randomUUID().toString()).concat(".zip"));
+            // TODO: Jeffa, enable the exclude option.
             //ZipUtils.zipFile(srcPath, cxZipFile, flowProperties.getZipExclude());
-            // TODO: Jeffa, enable the eclude option.
             ZipUtils.zipFile(srcPath, cxZipFile, null);
+            FileUtils.deleteDirectory(pathFile);
             return cxZipFile;
         } catch(GitAPIException | IOException e) {
             throw new CheckmarxException("Unable to clone Git Url.");
