@@ -429,14 +429,21 @@ public class CxService implements CxClient{
         ScanResults.ScanResultsBuilder scanResults = ScanResults.builder();
         CxScanParams params = scanIdMap.get(scanId.toString());
         Integer projectId = params.getProjectId();
-        getScanQueries(scanResults, projectId, scanId, filter);
+        String buId = getTeamId(cxProperties.getTeam());
+        String appId = getTeamId(params.getTeamName());
+        getScanQueries(scanResults, projectId, scanId, buId, appId, filter);
         scanResults.projectId(projectId.toString());
+        String deepLink = cxProperties.getPortalUrl().concat("/scan/business-unit/%s/application/%s/project/%s/scans/%s");
+        deepLink = String.format(deepLink, buId, appId, projectId, scanId);
+        scanResults.link(deepLink);
         return scanResults.build();
     }
 
     private void getScanQueries(ScanResults.ScanResultsBuilder scanResults,
                                     Integer projectId,
                                     Integer scanId,
+                                    String buId,
+                                    String appId,
                                     List<Filter> filter) throws CheckmarxException {
         CxScanSummary scanSummary = new CxScanSummary();
         HttpEntity httpEntity = new HttpEntity<>(null, authClient.createAuthHeaders());
@@ -448,9 +455,6 @@ public class CxService implements CxClient{
                 projectId,
                 scanId
                 );
-        CxScanParams params = scanIdMap.get(scanId.toString());
-        String buId = getTeamId(cxProperties.getTeam());
-        String appId = getTeamId(params.getTeamName());
         String deepLink = cxProperties.getPortalUrl().concat("/scan/business-unit/%s/application/%s/project/%s/scans/%s");
         deepLink = String.format(deepLink, buId, appId, projectId, scanId);
         OdScanQueries scanQueries = response.getBody();
