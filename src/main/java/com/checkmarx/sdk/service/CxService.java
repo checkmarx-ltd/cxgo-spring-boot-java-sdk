@@ -701,7 +701,7 @@ public class CxService implements CxClient{
                 projectId);
         OdScanList appList = response.getBody();
         for(OdScanListDataItem item : appList.getData().getItems()) {
-            if(item.getId() == scanId && item.getStatus().equals("Done")) {
+            if(item.getId().equals(scanId) && item.getStatus().equals("Done")) {
                 return SCAN_STATUS_FINISHED;
             } else if(item.getId() == scanId && item.getStatus().equals("Project sources scan failed")) {
                 return SCAN_STATUS_FAILED;
