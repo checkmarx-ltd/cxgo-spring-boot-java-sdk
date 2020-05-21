@@ -22,6 +22,7 @@ public class CxAuthService implements CxAuthClient {
     private final CxProperties cxProperties;
     private final RestTemplate restTemplate;
     private CxAuthResponse token = null;
+    private LocalDateTime tokenExpires = null;
     //
     /// REST API end-points
     //
@@ -37,10 +38,11 @@ public class CxAuthService implements CxAuthClient {
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setCacheControl(CacheControl.noCache());
         HttpEntity req = new HttpEntity<>(getJSONTokenReq(), headers);
-        this.token = restTemplate.postForObject(
+        token = restTemplate.postForObject(
                 cxProperties.getUrl().concat(GET_SESSION_TOKEN),
                 req,
                 CxAuthResponse.class);
+        tokenExpires = LocalDateTime.now().plusSeconds(token.getExpiresIn()-500); //expire 500 seconds early
     }
 
     @Override
@@ -56,15 +58,10 @@ public class CxAuthService implements CxAuthClient {
     }
 
     private boolean isTokenExpired() {
-        //this.token.getExpiresIn();
-        /*
         if (tokenExpires == null) {
             return true;
         }
         return LocalDateTime.now().isAfter(tokenExpires);
-
-         */
-        return false;
     }
 
     @Override
