@@ -455,25 +455,19 @@ public class CxService implements CxClient{
                 projectId,
                 scanId
                 );
-        String deepLink = cxProperties.getPortalUrl().concat("/scan/business-unit/%s/application/%s/project/%s/scans/%s");
-        deepLink = String.format(deepLink, buId, appId, projectId, scanId);
         OdScanQueries scanQueries = response.getBody();
         List<ScanResults.XIssue> xIssueList = new ArrayList<>();
         for(OdScanQueryItem item : scanQueries.getData().getItems()) {
-            summarizeSeverity(scanSummary, item);
-            ScanResults.XIssue.XIssueBuilder xib = ScanResults.XIssue.builder();
-            xib.link(deepLink);
-            xib.language(item.getLanguage());
             for(OdScanQueryCategory vulnerability : item.getCategories()) {
-                if(checkFilter(vulnerability, filter)) {
-                    xib.severity(vulnerability.getSeverity());
-                    xib.vulnerability(vulnerability.getTitle());
-                    getScanResults(xib, projectId, scanId, vulnerability.getId(), filter);
-                    ScanResults.XIssue issue = xib.build();
-                    if (!xIssueList.contains(issue)) {
-                        xIssueList.add(issue);
-                    }
-                }
+                getScanResults(buId,
+                                appId,
+                                projectId,
+                                scanId,
+                                item.getLanguage(),
+                                vulnerability,
+                                scanSummary,
+                                xIssueList,
+                                filter);
             }
         }
         scanResults.scanSummary(scanSummary);
@@ -487,31 +481,14 @@ public class CxService implements CxClient{
         scanResults.additionalDetails(additionalDetails);
     }
 
-    private void summarizeSeverity(CxScanSummary scanSummary, OdScanQueryItem vulnerability) {
-        if(scanSummary.getLowSeverity() == null) scanSummary.setLowSeverity(0);
-        if(scanSummary.getMediumSeverity() == null) scanSummary.setMediumSeverity(0);
-        if(scanSummary.getHighSeverity() == null) scanSummary.setHighSeverity(0);
-        for(OdScanQuerySeverity severity : vulnerability.getSeverity()) {
-            Integer cnt;
-            if(severity.getSeverityId().equals("low")) {
-                cnt = scanSummary.getLowSeverity() + severity.getAmount();
-                scanSummary.setLowSeverity(cnt);
-            }
-            if(severity.getSeverityId().equals("medium")) {
-                cnt = scanSummary.getMediumSeverity() + severity.getAmount();
-                scanSummary.setMediumSeverity(cnt);
-            }
-            if(severity.getSeverityId().equals("high")) {
-                cnt = scanSummary.getHighSeverity() + severity.getAmount();
-                scanSummary.setHighSeverity(cnt);
-            }
-        }
-    }
-
-    private void getScanResults(ScanResults.XIssue.XIssueBuilder xib,
+    private void getScanResults(String buId,
+                                    String appId,
                                     Integer projectId,
                                     Integer scanId,
-                                    Integer queryId,
+                                    String language,
+                                    OdScanQueryCategory vulnerability,
+                                    CxScanSummary scanSummary,
+                                    List<ScanResults.XIssue> xIssueList,
                                     List<Filter> filter) {
         HttpEntity httpEntity = new HttpEntity<>(null, authClient.createAuthHeaders());
         ResponseEntity<OdScanResults> response = restTemplate.exchange(
@@ -521,20 +498,51 @@ public class CxService implements CxClient{
                 OdScanResults.class,
                 projectId,
                 scanId,
-                queryId
+                vulnerability.getId()
         );
         OdScanResults scanResults = response.getBody();
         for(OdScanResultItem item : scanResults.getData().getItems()) {
-            xib.similarityId(item.getSimilarityId());
-            xib.file(item.getSourceFile());
-            //
-            /// Read the call stack for the issue.
-            //
-            getScanResultNodes(xib, projectId, scanId, item.getId());
+            if(checkFilter(vulnerability, filter)) {
+                String deepLink = cxProperties.getPortalUrl().concat("/scan/business-unit/%s/application/%s/project/%s/scans/%s");
+                deepLink = String.format(deepLink, buId, appId, projectId, scanId);
+                ScanResults.XIssue.XIssueBuilder xib = ScanResults.XIssue.builder();
+                xib.similarityId(item.getSimilarityId());
+                xib.file(item.getSourceFile());
+                xib.link(deepLink);
+                xib.language(language);
+                xib.severity(vulnerability.getSeverity());
+                xib.vulnerability(vulnerability.getTitle());
+                String comment = item.getHasNotes() ? item.getNotes() : "";
+                boolean falsePositive = (item.getState() == 2) ? true : false;
+                Map<Integer, ScanResults.IssueDetails> issueDetailsList = new HashMap<>();
+                Map<Integer, ScanResults.IssueDetails> detail = getScanResultDetails(projectId,
+                                                                                        scanId,
+                                                                                        item.getId(),
+                                                                                        comment,
+                                                                                        falsePositive);
+                Integer []keys = new Integer[1];
+                detail.keySet().toArray(keys);
+                Integer loc = keys[0];
+                ScanResults.IssueDetails issueDetail = detail.get(loc);
+                issueDetailsList.put(loc, issueDetail);
+                xib.details(issueDetailsList);
+                ScanResults.XIssue issue = xib.build();
+                if(!xIssueList.contains(issue)) {
+                    updateIssueSummary(scanSummary, item);
+                    xIssueList.add(issue);
+                } else {
+                    ScanResults.XIssue existingIssue = xIssueList.get(xIssueList.indexOf(issue));
+                    existingIssue.getDetails().put(loc, issueDetail);
+                }
+            }
         }
     }
 
-    private void getScanResultNodes(ScanResults.XIssue.XIssueBuilder xib, Integer projectId, Integer scanId, Integer resultId) {
+    private Map<Integer, ScanResults.IssueDetails> getScanResultDetails(Integer projectId,
+                                                          Integer scanId,
+                                                          Integer resultId,
+                                                          String comment,
+                                                          boolean falsePositive) {
         HttpEntity httpEntity = new HttpEntity<>(null, authClient.createAuthHeaders());
         ResponseEntity<OdScanNodes> response = restTemplate.exchange(
                 cxProperties.getUrl().concat(SCAN_RESULT_NODES_ENCODED),
@@ -546,17 +554,33 @@ public class CxService implements CxClient{
                 resultId
         );
         OdScanNodes scanNodes = response.getBody();
-        Map<Integer, ScanResults.IssueDetails> issueDetailsList = new HashMap<>();
-        for(int i = 0; i < scanNodes.getData().getItems().size(); i++) {
-            OdScanNodeItem item = scanNodes.getData().getItems().get(i);
+        ScanResults.IssueDetails issueDetails = null;
+        Map<Integer, ScanResults.IssueDetails> detail = new HashMap<>();
+        if(scanNodes.getData().getItems().size() > 0) {
+            OdScanNodeItem item = scanNodes.getData().getItems().get(0);
             String snippet = extractCodeSnippet(projectId, scanId, item.getLine(), item.getFile().getId());
-            ScanResults.IssueDetails issueDetails = new ScanResults.IssueDetails()
+            issueDetails = new ScanResults.IssueDetails()
                     .codeSnippet(snippet)
-                    .comment("")
-                    .falsePositive(false);
-            issueDetailsList.put(item.getLine(), issueDetails);
+                    .comment(comment)
+                    .falsePositive(falsePositive);
+            detail.put(item.getLine(), issueDetails);
         }
-        xib.details(issueDetailsList);
+        return detail;
+    }
+
+    private void updateIssueSummary(CxScanSummary scanSummary, OdScanResultItem vulnerability) {
+        if(scanSummary.getLowSeverity() == null) scanSummary.setLowSeverity(0);
+        if(scanSummary.getMediumSeverity() == null) scanSummary.setMediumSeverity(0);
+        if(scanSummary.getHighSeverity() == null) scanSummary.setHighSeverity(0);
+        if(vulnerability.getSeverity().equals("low")) {
+            scanSummary.setLowSeverity(scanSummary.getLowSeverity() + 1);
+        }
+        if(vulnerability.getSeverity().equals("medium")) {
+            scanSummary.setMediumSeverity(scanSummary.getMediumSeverity() + 1);
+        }
+        if(vulnerability.getSeverity().equals("high")) {
+            scanSummary.setHighSeverity(scanSummary.getHighSeverity() + 1);
+        }
     }
 
     /**
