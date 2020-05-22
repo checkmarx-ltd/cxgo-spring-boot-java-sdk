@@ -715,7 +715,7 @@ public class CxService implements CxClient{
     }
 
     public Integer getScanStatus(Integer projectId, Integer scanId) {
-        log.info("Retrieving OD Scan List");
+        log.debug("Retrieving OD Scan List");
         HttpEntity httpEntity = new HttpEntity<>(authClient.createAuthHeaders());
         ResponseEntity<OdScanList> response = restTemplate.exchange(
                 cxProperties.getUrl().concat(GET_SCAN_STATUS),
