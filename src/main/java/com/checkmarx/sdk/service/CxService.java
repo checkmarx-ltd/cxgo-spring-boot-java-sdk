@@ -10,6 +10,8 @@ import com.checkmarx.sdk.exception.CheckmarxException;
 import com.google.common.collect.ImmutableMap;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.eclipse.jgit.transport.CredentialsProvider;
+import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.slf4j.Logger;
@@ -28,6 +30,7 @@ import org.eclipse.jgit.api.errors.GitAPIException;
 
 import java.io.*;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -250,13 +253,18 @@ public class CxService implements CxClient{
         File pathFile = null;
         srcPath = cxProperties.getGitClonePath().concat("/").concat(UUID.randomUUID().toString());
         pathFile = new File(srcPath);
+
         try {
+            URI uri = new URI(gitURL);
+            String token = uri.getUserInfo();
+            CredentialsProvider credentialsProvider = new UsernamePasswordCredentialsProvider(token, "");
             log.info("Cloning code locally to {}", pathFile);
             Git.cloneRepository()
                     .setURI(gitURL)
                     .setBranch(branch)
                     .setBranchesToClone(Collections.singleton(branch))
                     .setDirectory(pathFile)
+                    .setCredentialsProvider(credentialsProvider)
                     .call()
                     .close();
             String cxZipFile = cxProperties.getGitClonePath().concat("/").concat("cx.".concat(UUID.randomUUID().toString()).concat(".zip"));
@@ -265,7 +273,7 @@ public class CxService implements CxClient{
             ZipUtils.zipFile(srcPath, cxZipFile, null);
             FileUtils.deleteDirectory(pathFile);
             return cxZipFile;
-        } catch(GitAPIException | IOException e) {
+        } catch(GitAPIException | IOException | URISyntaxException e) {
             throw new CheckmarxException("Unable to clone Git Url.");
         }
     }
