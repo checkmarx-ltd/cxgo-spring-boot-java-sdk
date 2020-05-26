@@ -27,6 +27,8 @@ import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
+import org.springframework.web.util.UriComponents;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.*;
 import java.net.URI;
@@ -256,8 +258,17 @@ public class CxService implements CxClient{
 
         try {
             URI uri = new URI(gitURL);
+            CredentialsProvider credentialsProvider = null;
             String token = uri.getUserInfo();
-            CredentialsProvider credentialsProvider = new UsernamePasswordCredentialsProvider(token, "");
+            if(token.startsWith("oauth2:")){
+                log.debug("Using gitlab clone");
+                token = token.replace("oauth2:","");
+                gitURL = gitURL.replace(uri.getUserInfo(), "gitlab-ci-token:".concat(token));
+                credentialsProvider = new UsernamePasswordCredentialsProvider("user", token);
+            }
+            else{
+                credentialsProvider = new UsernamePasswordCredentialsProvider(token, "");
+            }
             log.info("Cloning code locally to {}", pathFile);
             Git.cloneRepository()
                     .setURI(gitURL)
@@ -273,7 +284,11 @@ public class CxService implements CxClient{
             ZipUtils.zipFile(srcPath, cxZipFile, null);
             FileUtils.deleteDirectory(pathFile);
             return cxZipFile;
-        } catch(GitAPIException | IOException | URISyntaxException e) {
+        } catch (GitAPIException e)  {
+            log.error(ExceptionUtils.getRootCauseMessage(e));
+            throw new CheckmarxException("Unable to clone Git Url.");
+        } catch( IOException | URISyntaxException e) {
+            log.error(ExceptionUtils.getRootCauseMessage(e));
             throw new CheckmarxException("Unable to clone Git Url.");
         }
     }

@@ -10,7 +10,7 @@
 	</parent>
 	<groupId>com.github.checkmarx-ts</groupId>
 	<artifactId>cxod-spring-boot-sdk</artifactId>
-	<version>0.1.11</version>
+	<version>0.1.13</version>
 	<name>cxod-spring-boot-sdk</name>
 	<description>CxOD Java Spring Boot SDK</description>
 
