@@ -862,6 +862,11 @@ public class CxService implements CxClient{
     }
 
     @Override
+    public CxScanSettings getScanSettingsDto(int projectId) {
+        return null;
+    }
+
+    @Override
     public String getPresetName(Integer presetId) {
         return null;
     }
@@ -988,6 +993,11 @@ public class CxService implements CxClient{
 
     @Override
     public Integer getScanConfiguration(String configuration) throws CheckmarxException {
+        return null;
+    }
+
+    @Override
+    public String getScanConfigurationName(int configurationId) {
         return null;
     }
 
