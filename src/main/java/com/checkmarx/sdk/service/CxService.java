@@ -230,7 +230,7 @@ public class CxService implements CxClient{
         //File test = new File(prepareRepoFile(params.getGitUrl(), params.getBranch()));
         File test = new File(cxRepoFileService.prepareRepoFile(params.getGitUrl(), params.getBranch()));
         //String s3FilePath = postS3File(bucketURL, "testProj.zip", test, s3Fields);
-        String s3FilePath = postS3File(bucketURL, "archive.zip", test, s3Fields);
+        //String s3FilePath = postS3File(bucketURL, "archive.zip", test, s3Fields);
         //prepareRepoFile(params.getGitUrl(), params.getBranch());
         cxRepoFileService.prepareRepoFile(params.getGitUrl(), params.getBranch());
 
@@ -239,7 +239,7 @@ public class CxService implements CxClient{
         if(params.getSourceType() == CxScanParams.Type.FILE) {
             archive = new File(params.getFilePath());
         } else {
-            archive = new File(prepareRepoFile(params.getGitUrl(), params.getBranch()));
+            archive = new File(cxRepoFileService.prepareRepoFile(params.getGitUrl(), params.getBranch()));
         }
         String s3FilePath = postS3File(bucketURL, "archive.zip", archive, s3Fields);
         FileSystemUtils.deleteRecursively(archive);
