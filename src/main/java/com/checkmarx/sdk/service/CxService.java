@@ -873,7 +873,7 @@ public class CxService implements CxClient{
 
     @Override
     public Integer getProjectPresetId(Integer projectId) {
-        return null;
+        return -1;
     }
 
     @Override
