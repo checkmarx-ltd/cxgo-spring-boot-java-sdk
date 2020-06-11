@@ -15,6 +15,7 @@ import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.slf4j.Logger;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.*;
@@ -88,7 +89,7 @@ public class CxService implements CxClient{
     private static final String SCAN_FILE = "/projects/projects/{project_id}/scans/{scan_id}/files?filePath={file_path};";
     private static final String CREATE_APPLICATION = "/applications/applications";
     private static final String CREATE_PROJECT = "/projects/projects";
-    private static final String GET_PROJECTS = "/projects/projects?criteria=%7B%22criteria%22%3A%5B%7B%22key%22%3A%22applicationId%22%2C%22value%22%3A%22{app_id}%22%7D%5D%2C%22pagination%22%3A%7B%22currentPage%22%3A0%2C%22pageSize%22%3A50%7D%2C%22sorting%22%3A%5B%5D%7D";
+    public static final String GET_PROJECTS = "/projects/projects?criteria=%7B%22criteria%22%3A%5B%7B%22key%22%3A%22applicationId%22%2C%22value%22%3A%22{app_id}%22%7D%5D%2C%22pagination%22%3A%7B%22currentPage%22%3A0%2C%22pageSize%22%3A50%7D%2C%22sorting%22%3A%5B%5D%7D";
     private static final String GET_SCAN_STATUS = "/scans/scans?criteria=%7B%22criteria%22%3A%5B%7B%22key%22%3A%22projectId%22%2C%22value%22%3A%22{project_id}%22%7D%5D%2C%22pagination%22%3A%7B%22currentPage%22%3A0%2C%22pageSize%22%3A50%7D%2C%22sorting%22%3A%5B%5D%7D";
 
     private static Map<String, CxScanParams> scanIdMap = new HashMap();
@@ -97,6 +98,7 @@ public class CxService implements CxClient{
     private final CxAuthClient authClient;
     private final RestTemplate restTemplate;
     private Map<String, Object> codeCache = new HashMap<String, Object>();
+    private CxRepoFileService cxRepoFileService;
 
     public CxService(CxAuthClient authClient, CxProperties cxProperties, @Qualifier("cxRestTemplate") RestTemplate restTemplate) {
         this.authClient = authClient;
@@ -220,15 +222,28 @@ public class CxService implements CxClient{
         OdScanFileUploadData data = scanUpload.getData();
         OdScanFileUploadFields s3Fields = data.getFields();
         String bucketURL = data.getUrl();
+
+        // Now upload the file to the bucket
+        // Lines commented out are hack for a local file for quick testing
+        //File test = new File("C:\\Users\\JeffA\\Downloads\\testProj.zip");
+        //File test = new File("C:\\Users\\JeffA\\Downloads\\dvna-master.zip");
+        //File test = new File(prepareRepoFile(params.getGitUrl(), params.getBranch()));
+        File test = new File(cxRepoFileService.prepareRepoFile(params.getGitUrl(), params.getBranch()));
+        //String s3FilePath = postS3File(bucketURL, "testProj.zip", test, s3Fields);
+        //String s3FilePath = postS3File(bucketURL, "archive.zip", test, s3Fields);
+        //prepareRepoFile(params.getGitUrl(), params.getBranch());
+        cxRepoFileService.prepareRepoFile(params.getGitUrl(), params.getBranch());
+
         // Now, upload the file to the bucket
         File archive = null;
         if(params.getSourceType() == CxScanParams.Type.FILE) {
             archive = new File(params.getFilePath());
         } else {
-            archive = new File(prepareRepoFile(params.getGitUrl(), params.getBranch()));
+            archive = new File(cxRepoFileService.prepareRepoFile(params.getGitUrl(), params.getBranch()));
         }
         String s3FilePath = postS3File(bucketURL, "archive.zip", archive, s3Fields);
         FileSystemUtils.deleteRecursively(archive);
+
         //
         /// Finally the scan is kicked off
         //
@@ -248,49 +263,6 @@ public class CxService implements CxClient{
         OdScanTriggerResult triggerResult = triggerResp.getBody();
         scanIdMap.put(scanId, params);
         return Integer.parseInt(scanId);
-    }
-
-    private String prepareRepoFile(String gitURL, String branch) throws CheckmarxException {
-        String srcPath;
-        File pathFile = null;
-        srcPath = cxProperties.getGitClonePath().concat("/").concat(UUID.randomUUID().toString());
-        pathFile = new File(srcPath);
-
-        try {
-            URI uri = new URI(gitURL);
-            CredentialsProvider credentialsProvider = null;
-            String token = uri.getUserInfo();
-            if(token.startsWith("oauth2:")){
-                log.debug("Using gitlab clone");
-                token = token.replace("oauth2:","");
-                gitURL = gitURL.replace(uri.getUserInfo(), "gitlab-ci-token:".concat(token));
-                credentialsProvider = new UsernamePasswordCredentialsProvider("user", token);
-            }
-            else{
-                credentialsProvider = new UsernamePasswordCredentialsProvider(token, "");
-            }
-            log.info("Cloning code locally to {}", pathFile);
-            Git.cloneRepository()
-                    .setURI(gitURL)
-                    .setBranch(branch)
-                    .setBranchesToClone(Collections.singleton(branch))
-                    .setDirectory(pathFile)
-                    .setCredentialsProvider(credentialsProvider)
-                    .call()
-                    .close();
-            String cxZipFile = cxProperties.getGitClonePath().concat("/").concat("cx.".concat(UUID.randomUUID().toString()).concat(".zip"));
-            // TODO: Jeffa, enable the exclude option.
-            //ZipUtils.zipFile(srcPath, cxZipFile, flowProperties.getZipExclude());
-            ZipUtils.zipFile(srcPath, cxZipFile, null);
-            FileUtils.deleteDirectory(pathFile);
-            return cxZipFile;
-        } catch (GitAPIException e)  {
-            log.error(ExceptionUtils.getRootCauseMessage(e));
-            throw new CheckmarxException("Unable to clone Git Url.");
-        } catch( IOException | URISyntaxException e) {
-            log.error(ExceptionUtils.getRootCauseMessage(e));
-            throw new CheckmarxException("Unable to clone Git Url.");
-        }
     }
 
     private String postS3File(String targetURL, String filename, File file, OdScanFileUploadFields s3Fields) {
@@ -1034,5 +1006,10 @@ public class CxService implements CxClient{
     @Override
     public Integer getLdapServerId(String serverName) throws CheckmarxException {
         return null;
+    }
+
+    @Autowired
+    public void setCxRepoFileService(CxRepoFileService cxRepoFileService) {
+        this.cxRepoFileService = cxRepoFileService;
     }
 }
