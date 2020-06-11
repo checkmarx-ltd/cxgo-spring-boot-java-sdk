@@ -92,7 +92,23 @@ public class CxService implements CxClient{
     public static final String GET_PROJECTS = "/projects/projects?criteria=%7B%22criteria%22%3A%5B%7B%22key%22%3A%22applicationId%22%2C%22value%22%3A%22{app_id}%22%7D%5D%2C%22pagination%22%3A%7B%22currentPage%22%3A0%2C%22pageSize%22%3A50%7D%2C%22sorting%22%3A%5B%5D%7D";
     private static final String GET_SCAN_STATUS = "/scans/scans?criteria=%7B%22criteria%22%3A%5B%7B%22key%22%3A%22projectId%22%2C%22value%22%3A%22{project_id}%22%7D%5D%2C%22pagination%22%3A%7B%22currentPage%22%3A0%2C%22pageSize%22%3A50%7D%2C%22sorting%22%3A%5B%5D%7D";
 
+    //
+    /// CxOD required extra information for API calls not used by the SAST SDK. This
+    /// data structure is used to capture that information as CxService calls are made
+    /// during scan requests. This information is tracked using the current CxOD scan ID
+    /// as the key. The 'scanIdMap' and 'scanProbeMap' have to be constructed using
+    /// different keys because CxService is starting the processes differently; with new
+    /// scans we start with asking CxOD for a scanID, and with requests for previous
+    /// results we are starting with project information and trying to find the last
+    /// scanID.
+    //
     private static Map<String, CxScanParams> scanIdMap = new HashMap();
+    //
+    /// This was used for /scanresults API calls to avoid modifying CxFlow. This
+    /// captures information at key points as CxService API calls are made so
+    /// that it will be required later when needed using the team name as the key.
+    //
+    private static List<CxScanParams> scanProbeMap = new LinkedList<>();
 
     private final CxProperties cxProperties;
     private final CxAuthClient authClient;
@@ -333,16 +349,18 @@ public class CxService implements CxClient{
             ArrayList<Object> children = (ArrayList<Object>) o;
             if(title.equals(token)) {
                 if(i == buTokens.length) {
+                    CxScanParams csp = getScanProbeByTeam(id.toString());
+                    csp.setTeamName(teamPath);
                     return id.toString();
                 } else {
-                    return searchTreeChildren(buTokens, i, children);
+                    return searchTreeChildren(teamPath, buTokens, i, children);
                 }
             }
         }
         return UNKNOWN;
     }
 
-    private String searchTreeChildren(String []buTokens, int i, ArrayList<Object> children) {
+    private String searchTreeChildren(String teamPath, String []buTokens, int i, ArrayList<Object> children) {
         String token = buTokens[i++];
         for(Object item : children) {
             LinkedHashMap<String, Object> node = (LinkedHashMap<String, Object>)item;
@@ -355,9 +373,11 @@ public class CxService implements CxClient{
             ArrayList<Object> nodeChildren = (ArrayList<Object>)o;
             if(title.equals(token)) {
                 if(i == buTokens.length) {
+                    CxScanParams csp = getScanProbeByTeam(id.toString());
+                    csp.setTeamName(teamPath);
                     return id.toString();
                 } else {
-                    return searchTreeChildren(buTokens, i, nodeChildren);
+                    return searchTreeChildren(teamPath, buTokens, i, nodeChildren);
                 }
             }
         }
@@ -678,6 +698,8 @@ public class CxService implements CxClient{
         OdProjectList appList = response.getBody();
         for(OdProjectListDataItem item : appList.getData().getItems()) {
             if(item.getName().equals(name)) {
+                CxScanParams csp = getScanProbeByTeam(ownerId);
+                csp.setProjectId(item.getId());
                 return item.getId();
             }
         }
@@ -729,6 +751,103 @@ public class CxService implements CxClient{
         return -1;
     }
 
+    /**
+     * CxOD doesn't have projects in the same sense as normal SAST, this fakes
+     * it a little bit.
+     *
+     * @param projectId - the ID of the project setup
+     * @return the "simulated" project information
+     */
+    @Override
+    public CxProject getProject(Integer projectId) {
+        List<CxProject.CustomField> customFields = new ArrayList<>();
+        CxProject cp = CxProject.builder()
+                .id(projectId)
+                .isPublic(true)
+                .name("CXOD Temporary Project")
+                .teamId(null)
+                .links(null)
+                .customFields(customFields)
+                .build();
+        return cp;
+    }
+
+    /**
+     * If this is used for CxFlow /scanresults API calls. The ScanID will only contain the
+     * scan record if CxOD hasn't been restarted since the scan was run. This ensures the
+     * scan record is available in memory so that CxService can correctly look up the values.
+     *
+     * @param scanID
+     * @param projectID
+     */
+    private void setupScanIdMap(Integer scanID, Integer projectID) {
+        CxScanParams csp = getScanProbeByProject(projectID.toString());
+        if(csp != null) {
+            scanIdMap.put(scanID.toString(), csp);
+        }
+    }
+
+    private OdScanList getProjectScanList(Integer projectId) {
+        log.debug("Retrieving OD Scan List");
+        HttpEntity httpEntity = new HttpEntity<>(authClient.createAuthHeaders());
+        ResponseEntity<OdScanList> response = restTemplate.exchange(
+                cxProperties.getUrl().concat(GET_SCAN_STATUS),
+                HttpMethod.GET,
+                httpEntity,
+                OdScanList.class,
+                projectId);
+        return response.getBody();
+    }
+
+    @Override
+    public Integer getLastScanId(Integer projectId) {
+        OdScanList appList = getProjectScanList(projectId);
+        for(OdScanListDataItem item : appList.getData().getItems()) {
+            if(item.getStatus().equals("Done")) {
+                this.setupScanIdMap(item.getId(), projectId);
+                return item.getId();
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * Examins the current scan scanProbeMap and returns the record matching the teamID
+     * 'if' it exsits.
+     *
+     * @param teamID
+     * @return the CxScanParams record
+     */
+    private CxScanParams getScanProbeByTeam(String teamID) {
+        // First check it if it exists
+        for(CxScanParams csp: scanProbeMap) {
+            if(csp.getTeamId().equals(teamID)) {
+                return csp;
+            }
+        }
+        // If it doesn't exist then create it
+        CxScanParams csp = new CxScanParams();
+        csp.setTeamId(teamID);
+        scanProbeMap.add(csp);
+        return csp;
+    }
+
+    /**
+     * Examins the current scan scanProbeMap and returns the record matching the teamID
+     * 'if' it exsits.
+     *
+     * @param projectID
+     * @return the CxScanParams record
+     */
+    private CxScanParams getScanProbeByProject(String projectID) {
+        for(CxScanParams csp: scanProbeMap) {
+            if(csp.getProjectId().toString().equals(projectID)) {
+                return csp;
+            }
+        }
+        return null;
+    }
+
     //
     /// I think things below here should be removed the public interface. They are specific
     /// Cx SAST.
@@ -741,11 +860,6 @@ public class CxService implements CxClient{
     @Override
     public Integer getScanStatus(Integer scanId) {
         return 0;
-    }
-
-    @Override
-    public Integer getLastScanId(Integer projectId) {
-        return null;
     }
 
     @Override
@@ -810,11 +924,6 @@ public class CxService implements CxClient{
 
     @Override
     public List<CxProject> getProjects(String teamId) throws CheckmarxException {
-        return null;
-    }
-
-    @Override
-    public CxProject getProject(Integer projectId) {
         return null;
     }
 
@@ -993,8 +1102,17 @@ public class CxService implements CxClient{
         return null;
     }
 
+    public Integer getScanIdOfExistingScanIfExists(Integer projectId) {
+        return 0;
+    }
+
     @Override
     public void deleteScan(Integer scanId) throws CheckmarxException {
+
+    }
+
+    @Override
+    public void cancelScan(Integer scanId) throws CheckmarxException {
 
     }
 

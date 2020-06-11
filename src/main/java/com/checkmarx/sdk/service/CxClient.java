@@ -505,11 +505,27 @@ public interface CxClient {
     public void waitForScanCompletion(Integer scanId) throws CheckmarxException;
 
     /**
+     * Get scanId of existing if a scan exists for a projectId
+     *
+     * @param projectId
+     * @return
+     */
+    public Integer getScanIdOfExistingScanIfExists(Integer projectId);
+
+    /**
      *
      * @param scanId
      * @throws CheckmarxException
      */
     public void deleteScan(Integer scanId) throws CheckmarxException;
+
+    /**
+     *
+     * @param scanId
+     * @return
+     * @throws CheckmarxException
+     */
+    public void cancelScan(Integer scanId) throws CheckmarxException;
 
     /**
      * Create a scan based on the CxScanParams and return the ScanResults object based on filters
