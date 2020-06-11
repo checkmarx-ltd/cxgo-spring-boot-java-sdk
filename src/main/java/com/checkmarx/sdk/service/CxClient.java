@@ -188,6 +188,8 @@ public interface CxClient {
      */
     public String getScanSetting(Integer projectId);
 
+    CxScanSettings getScanSettingsDto(int projectId);
+
     /**
      * Get Preset Name based on Id
      *
@@ -441,6 +443,11 @@ public interface CxClient {
      * @throws CheckmarxException
      */
     public Integer getScanConfiguration(String configuration) throws CheckmarxException;
+
+    /**
+     * Get scan configuration name by Id.
+     */
+    String getScanConfigurationName(int configurationId);
 
     /**
      * Fetch the Id of a given preset name

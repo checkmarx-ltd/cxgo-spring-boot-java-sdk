@@ -2,6 +2,12 @@ package com.checkmarx.sdk.dto;
 
 import com.checkmarx.sdk.dto.cx.CxScanSummary;
 import com.checkmarx.sdk.dto.sca.SCAResults;
+import com.cx.restclient.sca.dto.report.Finding;
+import com.cx.restclient.sca.dto.report.Package;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.Setter;
 import org.modelmapper.Conditions;
 import org.modelmapper.ModelMapper;
 
@@ -174,6 +180,13 @@ public class ScanResults{
         modelMapper.map(scanResultsToMerge, this);
     }
 
+    public void mergeWith(ScanResults scanResultsToMerge) {
+        ModelMapper modelMapper = new ModelMapper();
+        modelMapper.getConfiguration().setPropertyCondition(Conditions.isNotNull());
+
+        modelMapper.map(scanResultsToMerge, this);
+    }
+
     public static class XIssue{
         private String vulnerability;
         private String similarityId;
@@ -186,6 +199,7 @@ public class ScanResults{
         private String filename;
         private String gitUrl;
         private int falsePositiveCount = 0;
+        private List<ScaDetails> scaDetails;
         private List<OsaDetails> osaDetails;
         private Map<Integer, IssueDetails>  details;
         private Map<String, Object> additionalDetails;
@@ -228,6 +242,14 @@ public class ScanResults{
             int result = vulnerability.hashCode();
             result = 5225 * result + filename.hashCode();
             return result;
+        }
+
+        public List<ScaDetails> getScaDetails() {
+            return scaDetails;
+        }
+
+        public void setScaDetails(List<ScaDetails> scaDetails) {
+            this.scaDetails = scaDetails;
         }
 
         public boolean isAllFalsePositive(){
@@ -480,6 +502,16 @@ public class ScanResults{
             return this;
         }
 
+    }
+
+    @Getter
+    @Setter
+    @AllArgsConstructor
+    @Builder
+    public static class ScaDetails {
+        private String vulnerabilityLink;
+        private Finding finding;
+        private Package vulnerabilityPackage;
     }
 
     public static class OsaDetails {
