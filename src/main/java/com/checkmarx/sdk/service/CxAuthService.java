@@ -28,7 +28,7 @@ public class CxAuthService implements CxAuthClient {
     //
     private static final String GET_SESSION_TOKEN = "/tokens/tokens/auth";
 
-    public CxAuthService(CxProperties cxProperties, @Qualifier("flowRestTemplate") RestTemplate restTemplate) {
+    public CxAuthService(CxProperties cxProperties, @Qualifier("cxRestTemplate") RestTemplate restTemplate) {
         this.cxProperties = cxProperties;
         this.restTemplate = restTemplate;
     }
