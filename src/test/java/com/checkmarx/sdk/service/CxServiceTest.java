@@ -21,6 +21,7 @@ import org.springframework.web.client.RestTemplate;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
@@ -96,11 +97,26 @@ public class CxServiceTest {
         HttpHeaders headers = new HttpHeaders();
         headers.setLocation(new URI(url));
 
+        OdProjectListDataItem itemListData = new OdProjectListDataItem();
+        itemListData.setName(projectName);
+        itemListData.setId(1);
+
+        List<OdProjectListDataItem> odProjectListDataItems = new ArrayList<>();
+        odProjectListDataItems.add(itemListData);
+
+        OdProjectListData odProjectListData = new OdProjectListData();
+        odProjectListData.setTotalCount(2l);
+        odProjectListData.setItems(odProjectListDataItems);
+
+        OdProjectList odProjectList = new OdProjectList();
+        odProjectList.setData(odProjectListData);
+
         ResponseEntity<OdProjectList> response = new ResponseEntity<OdProjectList>(projectList, HttpStatus.OK);
         ResponseEntity<OdScanCreate> createResp = new ResponseEntity<OdScanCreate>(odScanCreate, HttpStatus.OK);
         ResponseEntity<OdScanFileUpload> uploadResp = new ResponseEntity<OdScanFileUpload>(odScanFileUpload, HttpStatus.OK);
         ResponseEntity<String> s3Resp = new ResponseEntity<String>(headers, HttpStatus.OK);
         ResponseEntity<OdScanTriggerResult> triggerResp = new ResponseEntity<OdScanTriggerResult>( HttpStatus.OK);
+        ResponseEntity<OdProjectList> odProjectListResp = new ResponseEntity<OdProjectList>(odProjectList, HttpStatus.OK);
 
         cxService = new CxService(authClient, cxProperties, restTemplate);
         cxService.setCxRepoFileService( cxRepoFileService );
@@ -117,7 +133,8 @@ public class CxServiceTest {
 
         when(authClient.createAuthHeaders()).thenReturn(httpHeaders);
 
-        when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(), eq(OdProjectList.class), anyString())).thenReturn(response);
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(), eq(OdProjectList.class), anyString(), anyInt(), anyInt())).thenReturn(odProjectListResp);
+        //when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(), eq(OdProjectList.class), anyString())).thenReturn(response);
         when(restTemplate.exchange(anyString(), eq(HttpMethod.PUT), any(), eq(OdScanCreate.class))).thenReturn(createResp);
         when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(OdScanFileUpload.class))).thenReturn(uploadResp);
         when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(String.class))).thenReturn(s3Resp);
