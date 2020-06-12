@@ -36,7 +36,7 @@ import java.util.regex.Pattern;
 @Service
 public class CxService implements CxClient{
     private static final String UNKNOWN = "-1";
-
+    private static final Integer UNKNOWN_INT = -1;
     private static final Integer SCAN_STATUS_FINISHED = 7;
     private static final Integer SCAN_STATUS_CANCELED = 8;
     private static final Integer SCAN_STATUS_FAILED = 9;
@@ -231,17 +231,6 @@ public class CxService implements CxClient{
         String bucketURL = data.getUrl();
 
         // Now upload the file to the bucket
-        // Lines commented out are hack for a local file for quick testing
-        //File test = new File("C:\\Users\\JeffA\\Downloads\\testProj.zip");
-        //File test = new File("C:\\Users\\JeffA\\Downloads\\dvna-master.zip");
-        //File test = new File(prepareRepoFile(params.getGitUrl(), params.getBranch()));
-        File test = new File(cxRepoFileService.prepareRepoFile(params.getGitUrl(), params.getBranch()));
-        //String s3FilePath = postS3File(bucketURL, "testProj.zip", test, s3Fields);
-        //String s3FilePath = postS3File(bucketURL, "archive.zip", test, s3Fields);
-        //prepareRepoFile(params.getGitUrl(), params.getBranch());
-        cxRepoFileService.prepareRepoFile(params.getGitUrl(), params.getBranch());
-
-        // Now, upload the file to the bucket
         File archive = null;
         if(params.getSourceType() == CxScanParams.Type.FILE) {
             archive = new File(params.getFilePath());
@@ -718,7 +707,7 @@ public class CxService implements CxClient{
                 return item.getId();
             }
         }
-        return -1;
+        return UNKNOWN_INT;
     }
 
     private OdProjectList getProjectPage(String ownerId) {
@@ -793,7 +782,7 @@ public class CxService implements CxClient{
                 return SCAN_STATUS_FAILED;
             }
         }
-        return -1;
+        return UNKNOWN_INT;
     }
 
     private OdScanList getScanStatusPage(Integer projectId) {
@@ -880,7 +869,7 @@ public class CxService implements CxClient{
                 return item.getId();
             }
         }
-        return -1;
+        return UNKNOWN_INT;
     }
 
     /**
@@ -931,7 +920,7 @@ public class CxService implements CxClient{
 
     @Override
     public Integer getScanStatus(Integer scanId) {
-        return 0;
+        return UNKNOWN_INT;
     }
 
     @Override
@@ -1026,7 +1015,7 @@ public class CxService implements CxClient{
 
     @Override
     public Integer getProjectPresetId(Integer projectId) {
-        return -1;
+        return UNKNOWN_INT;
     }
 
     @Override
@@ -1175,7 +1164,7 @@ public class CxService implements CxClient{
     }
 
     public Integer getScanIdOfExistingScanIfExists(Integer projectId) {
-        return 0;
+        return UNKNOWN_INT;
     }
 
     @Override
