@@ -34,7 +34,7 @@ public class OdProjectListData {
     }
 
     @JsonProperty("totalCount")
-    public void setTotalCount(Long items) {
+    public void setTotalCount(Long totalCount) {
         this.totalCount = totalCount;
     }
 

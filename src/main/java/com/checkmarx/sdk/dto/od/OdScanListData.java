@@ -14,7 +14,7 @@ public class OdScanListData {
     @JsonProperty("items")
     private List<OdScanListDataItem> items = null;
     @JsonProperty("totalCount")
-    private Long totalCount;
+    private Integer totalCount;
     @JsonIgnore
     private Map<String, Object> additionalProperties = new HashMap<String, Object>();
 
@@ -29,12 +29,12 @@ public class OdScanListData {
     }
 
     @JsonProperty("totalCount")
-    public Long getTotalCount() {
+    public Integer getTotalCount() {
         return totalCount;
     }
 
     @JsonProperty("totalCount")
-    public void setTotalCount(Long items) {
+    public void setTotalCount(Integer totalCount) {
         this.totalCount = totalCount;
     }
 
