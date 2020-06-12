@@ -44,6 +44,13 @@ public class CxRepoFileService {
                 gitURL = gitURL.replace(uri.getUserInfo(), "gitlab-ci-token:".concat(token));
                 credentialsProvider = new UsernamePasswordCredentialsProvider("user", token);
             }
+            else if(token.contains(":")){
+                String[] userDetails = token.split(":");
+                if(userDetails.length == 2) {
+                    log.debug("Using clone with username/password");
+                    credentialsProvider = new UsernamePasswordCredentialsProvider(userDetails[0], userDetails[1]);
+                }
+            }
             else{
                 credentialsProvider = new UsernamePasswordCredentialsProvider(token, "");
             }
