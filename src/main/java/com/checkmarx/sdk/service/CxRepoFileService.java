@@ -64,9 +64,7 @@ public class CxRepoFileService {
                     .call()
                     .close();
             String cxZipFile = cxProperties.getGitClonePath().concat("/").concat("cx.".concat(UUID.randomUUID().toString()).concat(".zip"));
-            // TODO: Jeffa, enable the exclude option.
-            //ZipUtils.zipFile(srcPath, cxZipFile, flowProperties.getZipExclude());
-            ZipUtils.zipFile(srcPath, cxZipFile, null);
+            ZipUtils.zipFile(srcPath, cxZipFile, cxProperties.getExcludeFiles());
             try {
                 FileUtils.deleteDirectory(pathFile);
             } catch (IOException e){ //Do not thro
