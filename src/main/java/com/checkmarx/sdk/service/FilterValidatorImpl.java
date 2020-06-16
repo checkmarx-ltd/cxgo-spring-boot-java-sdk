@@ -119,11 +119,10 @@ public class FilterValidatorImpl implements FilterValidator {
     private static boolean findingPassesFilter(OdScanResultItem finding, List<Filter> filters) {
         List<String> statuses = new ArrayList<>();
         List<String> states = new ArrayList<>();
-        // TODO: I'm not certain this should be used?
         for (Filter filter : filters) {
             if (filter.getType().equals(Filter.Type.STATUS)) {
                 statuses.add(filter.getValue().toUpperCase(Locale.ROOT));
-            } else if (filter.getType().equals(Filter.Type.STATUS)) {
+            } else if (filter.getType().equals(Filter.Type.STATE)) {
                 String stateName = filter.getValue().toUpperCase(Locale.ROOT);
                 String stateId = STATE_MAP.get(stateName);
                 if (stateId == null) {
