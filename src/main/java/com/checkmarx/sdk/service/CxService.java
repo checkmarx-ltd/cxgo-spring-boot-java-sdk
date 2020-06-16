@@ -1,9 +1,9 @@
 package com.checkmarx.sdk.service;
 
 import com.checkmarx.sdk.config.CxProperties;
-import com.checkmarx.sdk.dto.Filter;
 import com.checkmarx.sdk.dto.ScanResults;
 import com.checkmarx.sdk.dto.cx.*;
+import com.checkmarx.sdk.dto.filtering.FilterConfiguration;
 import com.checkmarx.sdk.dto.od.*;
 import com.checkmarx.sdk.exception.CheckmarxException;
 import com.google.common.collect.ImmutableMap;
@@ -105,12 +105,17 @@ public class CxService implements CxClient{
     private final CxAuthClient authClient;
     private final RestTemplate restTemplate;
     private Map<String, Object> codeCache = new HashMap<String, Object>();
+    private final FilterValidator filterValidator;
     private CxRepoFileService cxRepoFileService;
 
-    public CxService(CxAuthClient authClient, CxProperties cxProperties, @Qualifier("cxRestTemplate") RestTemplate restTemplate) {
+    public CxService(CxAuthClient authClient,
+                     CxProperties cxProperties,
+                     @Qualifier("cxRestTemplate") RestTemplate restTemplate,
+                     FilterValidator filterValidator) {
         this.authClient = authClient;
         this.cxProperties = cxProperties;
         this.restTemplate = restTemplate;
+        this.filterValidator = filterValidator;
     }
 
     private String createApplication(String appName, String appDesc, String baBuId) {
@@ -420,7 +425,7 @@ public class CxService implements CxClient{
     }
 
     @Override
-    public ScanResults getReportContentByScanId(Integer scanId, List<Filter> filter) throws CheckmarxException {
+    public ScanResults getReportContentByScanId(Integer scanId, FilterConfiguration filter) throws CheckmarxException {
         ScanResults.ScanResultsBuilder scanResults = ScanResults.builder();
         CxScanParams params = scanIdMap.get(scanId.toString());
         Integer projectId = params.getProjectId();
@@ -439,7 +444,7 @@ public class CxService implements CxClient{
                                     Integer scanId,
                                     String buId,
                                     String appId,
-                                    List<Filter> filter) throws CheckmarxException {
+                                    FilterConfiguration filter) throws CheckmarxException {
         CxScanSummary scanSummary = new CxScanSummary();
         HttpEntity httpEntity = new HttpEntity<>(null, authClient.createAuthHeaders());
         ResponseEntity<OdScanQueries> response = restTemplate.exchange(
@@ -484,11 +489,11 @@ public class CxService implements CxClient{
                                     OdScanQueryCategory vulnerability,
                                     CxScanSummary scanSummary,
                                     List<ScanResults.XIssue> xIssueList,
-                                    List<Filter> filter) {
+                                    FilterConfiguration filter) {
 
         OdScanResults scanResults = getScanResultsPage(projectId, scanId, vulnerability);
         for(OdScanResultItem item : scanResults.getData().getItems()) {
-            if(checkFilter(vulnerability, filter)) {
+            if(filterValidator.passesFilter(vulnerability, item, filter)) {
                 String deepLink = cxProperties.getPortalUrl().concat("/scan/business-unit/%s/application/%s/project/%s/scans/%s");
                 deepLink = String.format(deepLink, buId, appId, projectId, scanId);
                 ScanResults.XIssue.XIssueBuilder xib = ScanResults.XIssue.builder();
@@ -607,41 +612,6 @@ public class CxService implements CxClient{
         if(vulnerability.getSeverity().equals("high")) {
             scanSummary.setHighSeverity(scanSummary.getHighSeverity() + 1);
         }
-    }
-
-    /**
-     * Check if the highlevel Query resultset meets the filter criteria
-     *
-     * @param q Issue containing results to filter
-     * @param filters Filters to apply to results.
-     * @return true if the Query meets filter criteria.
-     */
-    private boolean checkFilter(OdScanQueryCategory q, List<Filter> filters) {
-        if(filters == null || filters.isEmpty()) {
-            return true;
-        }
-        List<String> severity = new ArrayList<>();
-        List<String> cwe = new ArrayList<>();
-        List<String> category = new ArrayList<>();
-        for(Filter f: filters) {
-            Filter.Type type = f.getType();
-            String value = f.getValue();
-            if (type.equals(Filter.Type.SEVERITY)) {
-                severity.add(value.toUpperCase(Locale.ROOT));
-            } else if (type.equals(Filter.Type.TYPE)) {
-                category.add(value.toUpperCase(Locale.ROOT));
-            } else if (type.equals(Filter.Type.CWE)) {
-                cwe.add(value.toUpperCase(Locale.ROOT));
-            }
-        }
-        if(!severity.isEmpty() && !severity.contains(q.getSeverity().toUpperCase(Locale.ROOT))) {
-            return false;
-        }
-        // TODO: CWE filter is disabled because the data doesn't currently exist
-        //if (!cwe.isEmpty() && !cwe.contains(q.getMetadata().getCweId())) {
-        //    return false;
-        //}
-        return category.isEmpty() || category.contains(q.getTitle().toUpperCase(Locale.ROOT));
     }
 
     /**
@@ -909,6 +879,8 @@ public class CxService implements CxClient{
         return null;
     }
 
+
+
     //
     /// I think things below here should be removed the public interface. They are specific
     /// Cx SAST.
@@ -944,7 +916,7 @@ public class CxService implements CxClient{
     }
 
     @Override
-    public ScanResults getReportContent(Integer reportId, List<Filter> filter) throws CheckmarxException {
+    public ScanResults getReportContent(Integer reportId, FilterConfiguration filter) throws CheckmarxException {
         return null;
     }
 
@@ -954,12 +926,12 @@ public class CxService implements CxClient{
     }
 
     @Override
-    public ScanResults getReportContent(File file, List<Filter> filter) throws CheckmarxException {
+    public ScanResults getReportContent(File file, FilterConfiguration filter) throws CheckmarxException {
         return null;
     }
 
     @Override
-    public ScanResults getOsaReportContent(File vulnsFile, File libsFile, List<Filter> filter) throws CheckmarxException {
+    public ScanResults getOsaReportContent(File vulnsFile, File libsFile, FilterConfiguration filter) throws CheckmarxException {
         return null;
     }
 
@@ -1178,7 +1150,12 @@ public class CxService implements CxClient{
     }
 
     @Override
-    public ScanResults getLatestScanResults(String teamName, String projectName, List<Filter> filters) throws CheckmarxException {
+    public ScanResults createScanAndReport(CxScanParams params, String comment, FilterConfiguration filter) throws CheckmarxException {
+        return null;
+    }
+
+    @Override
+    public ScanResults getLatestScanResults(String teamName, String projectName, FilterConfiguration filter) throws CheckmarxException {
         return null;
     }
 
