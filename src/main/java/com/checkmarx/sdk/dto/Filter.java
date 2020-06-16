@@ -57,7 +57,8 @@ public class Filter {
         CWE("CWE"),
         OWASP("OWASP"),
         TYPE("TYPE"),
-        STATUS("STATUS");
+        STATUS("STATUS"),
+        STATE("STATE");
 
         private String type;
 

@@ -3,6 +3,7 @@ package com.checkmarx.sdk.service;
 import com.checkmarx.sdk.config.CxProperties;
 import com.checkmarx.sdk.dto.cx.CxAuthResponse;
 import com.checkmarx.sdk.dto.cx.CxScanParams;
+import com.checkmarx.sdk.dto.filtering.FilterConfiguration;
 import com.checkmarx.sdk.dto.od.*;
 import com.checkmarx.sdk.exception.CheckmarxException;
 import com.google.common.collect.Lists;
@@ -19,6 +20,7 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
+import javax.validation.constraints.NotNull;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
@@ -118,7 +120,9 @@ public class CxServiceTest {
         ResponseEntity<OdScanTriggerResult> triggerResp = new ResponseEntity<OdScanTriggerResult>( HttpStatus.OK);
         ResponseEntity<OdProjectList> odProjectListResp = new ResponseEntity<OdProjectList>(odProjectList, HttpStatus.OK);
 
-        cxService = new CxService(authClient, cxProperties, restTemplate);
+        // TODO: Pleas verify this temp rigging
+        FilterValidator validator = new FilterValidatorImpl();
+        cxService = new CxService(authClient, cxProperties, restTemplate, validator);
         cxService.setCxRepoFileService( cxRepoFileService );
 
         // prepare data

@@ -10,7 +10,7 @@
 	</parent>
 	<groupId>com.github.checkmarx-ts</groupId>
 	<artifactId>cxod-spring-boot-sdk</artifactId>
-	<version>0.1.17</version>
+	<version>0.1.18</version>
 	<name>cxod-spring-boot-sdk</name>
 	<description>CxOD Java Spring Boot SDK</description>
 
@@ -83,7 +83,12 @@
 			<artifactId>org.eclipse.jgit</artifactId>
 			<version>5.5.1.201910021850-r</version>
 		</dependency>
-	</dependencies>
+		<dependency>
+			<groupId>org.codehaus.groovy</groupId>
+			<artifactId>groovy</artifactId>
+			<version>3.0.4</version>
+		</dependency>
+    </dependencies>
 
 	<build>
 		<plugins>

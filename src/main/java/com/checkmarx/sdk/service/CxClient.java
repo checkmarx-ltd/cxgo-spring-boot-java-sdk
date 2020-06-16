@@ -1,10 +1,9 @@
 package com.checkmarx.sdk.service;
 
-import com.checkmarx.sdk.dto.Filter;
 import com.checkmarx.sdk.dto.ScanResults;
 import com.checkmarx.sdk.dto.cx.*;
 import com.checkmarx.sdk.exception.CheckmarxException;
-import com.checkmarx.sdk.exception.InvalidCredentialsException;
+import com.checkmarx.sdk.dto.filtering.FilterConfiguration;
 import org.json.JSONObject;
 
 import java.io.File;
@@ -72,7 +71,7 @@ public interface CxClient {
      * @return Contents of the current report
      * @throws CheckmarxException
      */
-    public ScanResults getReportContentByScanId(Integer scanId, List<Filter> filter) throws CheckmarxException;
+    public ScanResults getReportContentByScanId(Integer scanId, FilterConfiguration filter) throws CheckmarxException;
 
     /**
      * Retrieve the report by reportId, mapped to ScanResults DTO, applying filtering as requested
@@ -82,7 +81,7 @@ public interface CxClient {
      * @return Contents of the current report
      * @throws CheckmarxException
      */
-    public ScanResults getReportContent(Integer reportId, List<Filter> filter) throws CheckmarxException;
+    public ScanResults getReportContent(Integer reportId, FilterConfiguration filter) throws CheckmarxException;
 
     /**
      * Returns custom field values read from a Checkmarx project, based on given projectId.
@@ -100,7 +99,7 @@ public interface CxClient {
      * @return Contents of the current report
      * @throws CheckmarxException
      */
-    public ScanResults getReportContent(File file, List<Filter> filter) throws CheckmarxException;
+    public ScanResults getReportContent(File file, FilterConfiguration filter) throws CheckmarxException;
 
     /**
      * @param vulnsFile
@@ -109,7 +108,7 @@ public interface CxClient {
      * @return Contents of current OSA report
      * @throws CheckmarxException
      */
-    public ScanResults getOsaReportContent(File vulnsFile, File libsFile, List<Filter> filter) throws CheckmarxException;
+    public ScanResults getOsaReportContent(File vulnsFile, File libsFile, FilterConfiguration filter) throws CheckmarxException;
 
 
     public String getIssueDescription(Long scanId, Long pathId);
@@ -521,6 +520,16 @@ public interface CxClient {
 
     /**
      *
+     * @param params
+     * @param comment
+     * @param filter
+     * @return
+     * @throws CheckmarxException
+     */
+    public ScanResults createScanAndReport(CxScanParams params, String comment, FilterConfiguration filter) throws CheckmarxException;
+
+    /**
+     *
      * @param scanId
      * @return
      * @throws CheckmarxException
@@ -536,7 +545,7 @@ public interface CxClient {
      * @return Scan results
      * @throws CheckmarxException
      */
-    public ScanResults getLatestScanResults(String teamName, String projectName, List<Filter> filters) throws CheckmarxException;
+    public ScanResults getLatestScanResults(String teamName, String projectName, FilterConfiguration filter) throws CheckmarxException;
 
     public Integer getLdapServerId(String serverName) throws  CheckmarxException;
 
