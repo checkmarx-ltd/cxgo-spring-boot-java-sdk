@@ -241,7 +241,7 @@ public class CxService implements CxClient{
         if(params.getSourceType() == CxScanParams.Type.FILE) {
             archive = new File(params.getFilePath());
         } else {
-            archive = new File(cxRepoFileService.prepareRepoFile(params.getGitUrl(), params.getBranch()));
+            archive = new File(cxRepoFileService.prepareRepoFile(params));
         }
         String s3FilePath = postS3File(bucketURL, "archive.zip", archive, s3Fields);
         FileSystemUtils.deleteRecursively(archive);

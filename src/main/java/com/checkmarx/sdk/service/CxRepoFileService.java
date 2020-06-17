@@ -1,6 +1,7 @@
 package com.checkmarx.sdk.service;
 
 import com.checkmarx.sdk.config.CxProperties;
+import com.checkmarx.sdk.dto.cx.CxScanParams;
 import com.checkmarx.sdk.exception.CheckmarxException;
 import com.checkmarx.sdk.utils.ZipUtils;
 import org.apache.commons.io.FileUtils;
@@ -28,7 +29,9 @@ public class CxRepoFileService {
         this.cxProperties = cxProperties;
     }
 
-    public String prepareRepoFile(String gitURL, String branch) throws CheckmarxException {
+    public String prepareRepoFile(CxScanParams params) throws CheckmarxException {
+        String gitURL = params.getGitUrl();
+        String branch = params.getBranch();
         String srcPath;
         File pathFile = null;
         srcPath = cxProperties.getGitClonePath().concat("/").concat(UUID.randomUUID().toString());
@@ -64,7 +67,7 @@ public class CxRepoFileService {
                     .call()
                     .close();
             String cxZipFile = cxProperties.getGitClonePath().concat("/").concat("cx.".concat(UUID.randomUUID().toString()).concat(".zip"));
-            ZipUtils.zipFile(srcPath, cxZipFile, cxProperties.getExcludeFiles());
+            ZipUtils.zipFile(srcPath, cxZipFile, String.join(",",params.getFileExclude()));
             try {
                 FileUtils.deleteDirectory(pathFile);
             } catch (IOException e){ //Do not thro
