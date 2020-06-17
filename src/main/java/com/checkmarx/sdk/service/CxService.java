@@ -1,6 +1,7 @@
 package com.checkmarx.sdk.service;
 
 import com.checkmarx.sdk.config.CxProperties;
+import com.checkmarx.sdk.dto.Filter;
 import com.checkmarx.sdk.dto.ScanResults;
 import com.checkmarx.sdk.dto.cx.*;
 import com.checkmarx.sdk.dto.filtering.FilterConfiguration;
@@ -931,7 +932,7 @@ public class CxService implements CxClient{
     }
 
     @Override
-    public ScanResults getOsaReportContent(File vulnsFile, File libsFile, FilterConfiguration filter) throws CheckmarxException {
+    public ScanResults getOsaReportContent(File vulnsFile, File libsFile, List<Filter> filter) throws CheckmarxException {
         return null;
     }
 
