@@ -1,5 +1,6 @@
 package com.checkmarx.sdk.service;
 
+import com.checkmarx.sdk.dto.Filter;
 import com.checkmarx.sdk.dto.ScanResults;
 import com.checkmarx.sdk.dto.cx.*;
 import com.checkmarx.sdk.exception.CheckmarxException;
@@ -108,7 +109,7 @@ public interface CxClient {
      * @return Contents of current OSA report
      * @throws CheckmarxException
      */
-    public ScanResults getOsaReportContent(File vulnsFile, File libsFile, FilterConfiguration filter) throws CheckmarxException;
+    public ScanResults getOsaReportContent(File vulnsFile, File libsFile, List<Filter> filter) throws CheckmarxException;
 
 
     public String getIssueDescription(Long scanId, Long pathId);
@@ -541,7 +542,7 @@ public interface CxClient {
      *
      * @param teamName
      * @param projectName
-     * @param filters
+     * @param filter
      * @return Scan results
      * @throws CheckmarxException
      */
