@@ -130,20 +130,14 @@ public class CxServiceTest {
         when(cxScanParams.getTeamId()).thenReturn(teamID);
         when(cxScanParams.getProjectName()).thenReturn(projectName);
         when(cxScanParams.getProjectId()).thenReturn(projectIDInt);
-        when(cxScanParams.getGitUrl()).thenReturn(url);
-        when(cxScanParams.getBranch()).thenReturn(branch);
-        //when(cxProperties.getGitClonePath()).thenReturn(clonePath);
         when(cxProperties.getScanPreset()).thenReturn(scanPreset);
-
         when(authClient.createAuthHeaders()).thenReturn(httpHeaders);
-
         when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(), eq(OdProjectList.class), anyString(), anyInt(), anyInt())).thenReturn(odProjectListResp);
         when(restTemplate.exchange(anyString(), eq(HttpMethod.PUT), any(), eq(OdScanCreate.class))).thenReturn(createResp);
         when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(OdScanFileUpload.class))).thenReturn(uploadResp);
         when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(String.class))).thenReturn(s3Resp);
         when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(OdScanTriggerResult.class))).thenReturn(triggerResp);
-
-        when(cxRepoFileService.prepareRepoFile(anyString(), anyString())).thenReturn(repoFile);
+        when(cxRepoFileService.prepareRepoFile(cxScanParams)).thenReturn(repoFile);
     }
 
     @Test
