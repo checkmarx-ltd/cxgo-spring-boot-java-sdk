@@ -138,7 +138,6 @@ public class CxServiceTest {
         when(authClient.createAuthHeaders()).thenReturn(httpHeaders);
 
         when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(), eq(OdProjectList.class), anyString(), anyInt(), anyInt())).thenReturn(odProjectListResp);
-        //when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(), eq(OdProjectList.class), anyString())).thenReturn(response);
         when(restTemplate.exchange(anyString(), eq(HttpMethod.PUT), any(), eq(OdScanCreate.class))).thenReturn(createResp);
         when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(OdScanFileUpload.class))).thenReturn(uploadResp);
         when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(String.class))).thenReturn(s3Resp);
@@ -171,26 +170,78 @@ public class CxServiceTest {
     public void getScanStatus_withValidParams_expectsScanStatus(){
         int projectId = 123;
         int scanId = 2;
-        //cxService.getScanStatus(projectId, scanId);
+
+        OdScanListDataItem i = new OdScanListDataItem();
+        i.setId(2);
+        i.setStatus("Done");
+
+        List<OdScanListDataItem> items = new ArrayList<>();
+        items.add( i );
+
+        OdScanListData data = new OdScanListData();
+        data.setTotalCount(5);
+        data.setItems(items);
+
+        OdScanList odScanList = new OdScanList();
+        odScanList.setData(data);
+
+        ResponseEntity<OdScanList> odScanListResp = new ResponseEntity<OdScanList>(odScanList, HttpStatus.OK);
+
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(), eq(OdScanList.class), anyInt(), anyInt(), anyInt())).thenReturn(odScanListResp);
+
+        int status = cxService.getScanStatus(projectId, scanId);
+        assertEquals(7, status);
     }
 
     @Test
     public void waitForScanCompletion_withValidScanID_shouldSuccess() throws CheckmarxException {
-        int scanId = 920;
-        //cxService.waitForScanCompletion(scanId);
+        int scanId = cxService.createScan(cxScanParams, "comment123");
+        OdScanListDataItem i = new OdScanListDataItem();
+        i.setId(scanId);
+        i.setStatus("Done");
+
+        List<OdScanListDataItem> items = new ArrayList<>();
+        items.add( i );
+
+        OdScanListData data = new OdScanListData();
+        data.setTotalCount(5);
+        data.setItems(items);
+
+        OdScanList odScanList = new OdScanList();
+        odScanList.setData(data);
+
+        ResponseEntity<OdScanList> response = new ResponseEntity<OdScanList>(odScanList, HttpStatus.OK);
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(), eq(OdScanList.class), anyInt(), anyInt(), anyInt()))
+                .thenReturn(response);
+
+        cxService.waitForScanCompletion(scanId);
     }
 
     @Test
     public void getProjectId_withOwnerIdName_shouldReturnID(){
-        String ownerId = "wee1";
-        String name = "test";
-        cxService.getProjectId(ownerId, name);
+        String ownerId = "owner123";
+        String name    = "projectName123";
+        int projectID = cxService.getProjectId(ownerId, name);
+        assertEquals(1, projectID);
     }
 
     @Test
     public void createTeam_withParentName_returnsNewString() throws CheckmarxException {
         String parentID = "parent123";
-        String team = "test-team";
-        //cxService.createTeam(parentID, team);
+        String team     = "test-team";
+        String badID    = "bad123";
+
+        OdApplicationCreateData data = new OdApplicationCreateData();
+        data.setBaId(badID);
+
+        OdApplicationCreate app = new OdApplicationCreate();
+        app.setData(data);
+
+        ResponseEntity<OdApplicationCreate> response = new ResponseEntity<OdApplicationCreate>(app, HttpStatus.OK);
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.PUT), any(), eq(OdApplicationCreate.class)))
+                .thenReturn(response);
+
+        String responseBadID = cxService.createTeam(parentID, team);
+        assertEquals(badID, responseBadID);
     }
 }
