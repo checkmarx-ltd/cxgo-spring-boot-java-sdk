@@ -189,6 +189,7 @@ public class ScanResults{
 
     public static class XIssue{
         private String vulnerability;
+        private String vulnerabilityStatus;
         private String similarityId;
         private String cwe;
         private String cve;
@@ -204,10 +205,11 @@ public class ScanResults{
         private Map<Integer, IssueDetails>  details;
         private Map<String, Object> additionalDetails;
 
-        XIssue(String vulnerability, String similarityId, String cwe, String cve, String description, String language,
+        XIssue(String vulnerability, String vulnerabilityStatus, String similarityId, String cwe, String cve, String description, String language,
                String severity, String link, String filename, String gitUrl, List<OsaDetails> osaDetails, Map<Integer, IssueDetails> details,
                Map<String, Object> additionalDetails) {
             this.vulnerability = vulnerability;
+            this.vulnerabilityStatus = vulnerabilityStatus;
             this.similarityId = similarityId;
             this.cwe = cwe;
             this.cve = cve;
@@ -242,6 +244,14 @@ public class ScanResults{
             int result = vulnerability.hashCode();
             result = 5225 * result + filename.hashCode();
             return result;
+        }
+
+        public String getVulnerabilityStatus() {
+            return vulnerabilityStatus;
+        }
+
+        public void setVulnerabilityStatus(String vulnerabilityStatus) {
+            this.vulnerabilityStatus = vulnerabilityStatus;
         }
 
         public List<ScaDetails> getScaDetails() {
@@ -373,6 +383,7 @@ public class ScanResults{
 
         public static class XIssueBuilder {
             private String vulnerability;
+            private String vulnerabilityStatus;
             private String similarityId;
             private String cwe;
             private String cve;
@@ -391,6 +402,10 @@ public class ScanResults{
             public XIssue.XIssueBuilder vulnerability(String vulnerability) {
                 this.vulnerability = vulnerability;
                 return this;
+            }
+
+            public void vulnerabilityStatus(String vulnerabilityStatus) {
+                this.vulnerabilityStatus = vulnerabilityStatus;
             }
 
             public XIssue.XIssueBuilder similarityId(String similarityId) {
@@ -449,7 +464,7 @@ public class ScanResults{
             }
 
             public XIssue build() {
-                return new XIssue(vulnerability, similarityId, cwe, cve, description, language, severity, link, file, "", osaDetails, details, additionalDetails);
+                return new XIssue(vulnerability, vulnerabilityStatus, similarityId, cwe, cve, description, language, severity, link, file, "", osaDetails, details, additionalDetails);
             }
 
             @Override
