@@ -32,6 +32,8 @@ public class CxConfig implements Serializable {
     private Sast sast;
     @JsonProperty("osa")
     private Osa osa;
+    @JsonProperty("sca")
+    private Sca sca;
     @JsonProperty("additionalProperties")
     private Map<String, Object> additionalProperties = new HashMap<String, Object>();
 
@@ -135,6 +137,14 @@ public class CxConfig implements Serializable {
     @JsonProperty("osa")
     public void setOsa(Osa osa) {
         this.osa = osa;
+    }
+
+    public Sca getSca() {
+        return sca;
+    }
+
+    public void setSca(Sca sca) {
+        this.sca = sca;
     }
 
     @JsonProperty("additionalProperties")
