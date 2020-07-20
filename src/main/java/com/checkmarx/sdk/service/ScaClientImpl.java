@@ -18,16 +18,21 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
-
+import java.io.File;
 import java.io.IOException;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Iterator;
+import java.util.EnumSet;
 
 @Slf4j
 @RequiredArgsConstructor
 @Service
 public class ScaClientImpl implements ScaClient {
     private static final String ERROR_PREFIX = "SCA scan cannot be initiated.";
+    private static final int SCA_SCAN_INTERVAL_IN_SECONDS = 5;
 
     private final ScaProperties scaProperties;
 
@@ -36,9 +41,74 @@ public class ScaClientImpl implements ScaClient {
         validate(scaParams);
 
         CxScanConfig scanConfig = getScanConfig(scaParams);
+        scanConfig.setOsaProgressInterval(SCA_SCAN_INTERVAL_IN_SECONDS);
         DependencyScanResults scanResults = executeScan(scanConfig);
 
-        return toScaResults(scanResults.getScaResults());
+        SCAResults scaResults = toScaResults(scanResults.getScaResults());
+        applyScaResultsFilters(scaResults);
+
+        return scaResults;
+    }
+
+    @Override
+    public SCAResults scanLocalSource(SCAParams scaParams) throws IOException {
+        validate(scaParams);
+
+        CxScanConfig scanConfig = getScanConfig(scaParams);
+        scanConfig.setZipFile(new File(scaParams.getZipPath()));
+        scanConfig.setOsaProgressInterval(SCA_SCAN_INTERVAL_IN_SECONDS);
+        /*
+        TODO
+        ...
+        LOGIC for Resolver functionality (package manager)
+        ...
+         */
+        DependencyScanResults scanResults = executeScan(scanConfig);
+
+        SCAResults scaResults = toScaResults(scanResults.getScaResults());
+        applyScaResultsFilters(scaResults);
+
+        return scaResults;
+    }
+
+    private void applyScaResultsFilters(SCAResults scaResults) {
+        if (scaProperties.getFilterSeverity() != null && !Objects.requireNonNull(scaProperties.getFilterSeverity()).isEmpty()) {
+            filterResultsBySeverity(scaResults, scaProperties.getFilterSeverity());
+        }
+
+        Double filterScore = scaProperties.getFilterScore();
+        if (filterScore != null && filterScore >= 0.0) {
+            filterResultsByScore(scaResults, filterScore);
+        } else  {
+            log.info("Cx-SCA filter score is not defined", filterScore); ;
+        }
+    }
+
+    private void filterResultsBySeverity(SCAResults scaResults, List<String> filerSeverity) {
+        List<String> validateFilterSeverity = validateFilterSeverity(filerSeverity);
+        log.info("Applying Cx-SCA results filter severities: [{}]", validateFilterSeverity.toString());
+        scaResults.getFindings().removeIf(finding -> (
+                !StringUtils.containsIgnoreCase(validateFilterSeverity.toString(), finding.getSeverity().name())
+        ));
+    }
+
+    private void filterResultsByScore(SCAResults scaResults, double score) {
+        log.info("Applying Cx-SCA results filter score: [{}]", score);
+        scaResults.getFindings().removeIf(finding -> (
+                finding.getScore() < score
+        ));
+    }
+
+    private List<String> validateFilterSeverity(List<String> filerSeverity) {
+        Iterator<String> iterator = filerSeverity.iterator();
+        while (iterator.hasNext()) {
+            String nextFilter = iterator.next();
+            if (!StringUtils.containsIgnoreCase(EnumSet.range(Filter.Severity.HIGH, Filter.Severity.LOW).toString(), nextFilter)) {
+                log.warn("Severity: [{}] is not a supported filter", nextFilter);
+                iterator.remove();
+            }
+        }
+        return filerSeverity;
     }
 
     /**
@@ -85,11 +155,15 @@ public class ScaClientImpl implements ScaClient {
         scaConfig.setTenant(scaProperties.getTenant());
         scaConfig.setUsername(scaProperties.getUsername());
         scaConfig.setPassword(scaProperties.getPassword());
-        scaConfig.setSourceLocationType(SourceLocationType.REMOTE_REPOSITORY);
-
-        RemoteRepositoryInfo remoteRepoInfo = new RemoteRepositoryInfo();
-        remoteRepoInfo.setUrl(scaParams.getRemoteRepoUrl());
-        scaConfig.setRemoteRepositoryInfo(remoteRepoInfo);
+        if(scaParams.getZipPath() != null){
+            scaConfig.setSourceLocationType(SourceLocationType.LOCAL_DIRECTORY);
+        }
+        else{
+            scaConfig.setSourceLocationType(SourceLocationType.REMOTE_REPOSITORY);
+            RemoteRepositoryInfo remoteRepoInfo = new RemoteRepositoryInfo();
+            remoteRepoInfo.setUrl(scaParams.getRemoteRepoUrl());
+            scaConfig.setRemoteRepositoryInfo(remoteRepoInfo);
+        }
 
         return scaConfig;
     }
@@ -118,8 +192,12 @@ public class ScaClientImpl implements ScaClient {
             throw new SCARuntimeException(String.format("%s SCA parameters weren't provided.", ERROR_PREFIX));
         }
 
-        if (scaParams.getRemoteRepoUrl() == null) {
-            throw new SCARuntimeException(String.format("%s Repository URL wasn't provided.", ERROR_PREFIX));
+        if (scaParams.getRemoteRepoUrl() == null && scaParams.getZipPath() == null) {
+            throw new SCARuntimeException(String.format("%s Repository URL or Zip path wasn't provided.", ERROR_PREFIX));
+        }
+
+        if(!(new File(scaParams.getZipPath()).exists())){
+            throw new SCARuntimeException(String.format("%s file (%s) does not exist.", ERROR_PREFIX, scaParams.getZipPath()));
         }
     }
 
