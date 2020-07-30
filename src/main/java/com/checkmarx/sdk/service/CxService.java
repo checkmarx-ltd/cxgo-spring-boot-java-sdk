@@ -41,31 +41,6 @@ public class CxService implements CxClient{
     private static final Integer SCAN_STATUS_FINISHED = 7;
     private static final Integer SCAN_STATUS_CANCELED = 8;
     private static final Integer SCAN_STATUS_FAILED = 9;
-
-    //
-    /// Scan Preset Definitions for reference
-    //
-    public static final Integer CXOD_MOBILE_NATIVE = 1;
-    public static final Integer CXOD_MOBILE_WEB_BASED = 2;
-    public static final Integer CXOD_DESKTOP_NATIVE = 3;
-    public static final Integer CXOD_DESKTOP_WEB = 4;
-    public static final Integer CXOD_API = 5;
-    public static final Integer CXOD_FRONTEND = 6;
-    public static final Integer CXOD_BACKEND = 7;
-    public static final Integer CXOD_LAMBDA = 8;
-    public static final Integer CXOD_CLI = 9;
-    public static final Integer CXOD_SERVICE = 10;
-    public static final Integer CXOD_SMART_DEVICE = 11;
-    public static final Integer CXOD_OTHER = 12;
-
-
-    public static final Integer REPORT_STATUS_CREATED = 2;
-    private static final Map<String, Integer> STATUS_MAP = ImmutableMap.of(
-            "TO VERIFY", 0,
-            "CONFIRMED", 2,
-            "URGENT", 3,
-            "PROPOSED NOT EXPLOITABLE",4
-    );
     private static final Logger log = org.slf4j.LoggerFactory.getLogger(CxService.class);
 
     //
@@ -146,6 +121,7 @@ public class CxService implements CxClient{
             createBody.put("description", appDesc);
             createBody.put("criticality", 5);
             createBody.put("baBuId", baBuId);
+            createBody.put("licenseType", "standard");
             requestBody.put("businessApplication", createBody);
         } catch (JSONException e) {
             log.error("Error generating JSON App create Request object - JSON object will be empty");
