@@ -6,7 +6,7 @@ import com.checkmarx.sdk.dto.cx.CxScanParams;
 import com.checkmarx.sdk.dto.od.*;
 import com.checkmarx.sdk.exception.CheckmarxException;
 import com.checkmarx.sdk.service.*;
-import com.checkmarx.test.CxConfigMock;
+import com.checkmarx.sdk.service.CxConfigMock;
 import com.google.common.collect.Lists;
 import io.cucumber.java.en.Given;
 import org.junit.runner.RunWith;
