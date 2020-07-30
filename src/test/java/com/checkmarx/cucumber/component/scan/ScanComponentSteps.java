@@ -1,15 +1,13 @@
 package com.checkmarx.cucumber.component.scan;
 
 import com.checkmarx.sdk.CheckmarxSdkApplication;
-import com.checkmarx.sdk.config.CxConfig;
 import com.checkmarx.sdk.config.CxProperties;
 import com.checkmarx.sdk.dto.cx.CxScanParams;
 import com.checkmarx.sdk.dto.od.*;
 import com.checkmarx.sdk.exception.CheckmarxException;
 import com.checkmarx.sdk.service.*;
-import com.checkmarx.sdk.test.CxConfigMock;
+import com.checkmarx.test.CxConfigMock;
 import com.google.common.collect.Lists;
-import io.cucumber.java.Before;
 import io.cucumber.java.en.Given;
 import org.junit.runner.RunWith;
 import org.mockito.junit.MockitoJUnitRunner;

@@ -1,9 +1,8 @@
-package com.checkmarx.sdk.test;
+package com.checkmarx.test;
 
 import com.checkmarx.sdk.config.CxProperties;
 import com.checkmarx.sdk.dto.cx.CxScanParams;
 import com.checkmarx.sdk.service.CxAuthClient;
-import com.checkmarx.sdk.service.CxClient;
 import com.checkmarx.sdk.service.CxRepoFileService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
