@@ -1,4 +1,4 @@
-package com.checkmarx.sdk.test;
+package com.checkmarx.sdk.service;
 
 import com.checkmarx.sdk.config.CxProperties;
 import com.checkmarx.sdk.dto.cx.CxScanParams;
