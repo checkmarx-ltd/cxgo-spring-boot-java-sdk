@@ -36,11 +36,11 @@ public class AstClientImpl extends AbstractClientImpl {
     private final AstProperties astProperties;
 
 
-    protected void applyScaResultsFilters(ASTResultsWrapper combinedResults) {
-      //currently do nothing
+    protected void applyScaResultsFilters(ASTResultsWrapper combinedResults, ScanParams scanParams) {
+        //currently do nothing
     }
 
-  
+
     /**
      * Convert Common Client representation of SCA results into an object from this SDK.
      */
@@ -50,10 +50,10 @@ public class AstClientImpl extends AbstractClientImpl {
         validateNotNull(scanResults.getAstResults());
 
         AstSastSummaryResults summary = scanResults.getAstResults().getSummary();
- 
+
         ModelMapper mapper = new ModelMapper();
         ASTResults astResults = mapper.map(scanResults.getAstResults(), ASTResults.class);
-        
+
         return new ASTResultsWrapper(new SCAResults(), astResults);
     }
 
@@ -98,7 +98,7 @@ public class AstClientImpl extends AbstractClientImpl {
             remoteRepoInfo.setUrl(scanParams.getRemoteRepoUrl());
             astConfig.setRemoteRepositoryInfo(remoteRepoInfo);
         }
-        
+
         return astConfig;
     }
 
@@ -108,7 +108,7 @@ public class AstClientImpl extends AbstractClientImpl {
         if (scanParams == null) {
             throw new ASTRuntimeException(String.format("%s SCA parameters weren't provided.", ERROR_PREFIX));
         }
-         validateNotEmpty(astProperties.getApiUrl(), "AST API URL");
+        validateNotEmpty(astProperties.getApiUrl(), "AST API URL");
         validateNotEmpty(astProperties.getToken(), "AST Access Token");
         validateNotEmpty(astProperties.getPreset(), "AST preset");
         validateNotEmpty(astProperties.getIncremental(), "Is Incremental flag");
