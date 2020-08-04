@@ -6,10 +6,12 @@ import com.checkmarx.sdk.dto.ast.SCAResults;
 import com.checkmarx.sdk.dto.ast.ScanParams;
 import com.checkmarx.sdk.exception.ASTRuntimeException;
 
-import com.cx.restclient.ast.dto.common.ASTSummaryResults;
+
 import com.cx.restclient.ast.dto.common.RemoteRepositoryInfo;
 import com.cx.restclient.ast.dto.common.SummaryResults;
 import com.cx.restclient.ast.dto.sast.AstSastConfig;
+import com.cx.restclient.ast.dto.sast.AstSastResults;
+import com.cx.restclient.ast.dto.sast.report.AstSastSummaryResults;
 import com.cx.restclient.configuration.CxScanConfig;
 import com.checkmarx.sdk.dto.ast.ASTResults;
 
@@ -21,7 +23,7 @@ import com.cx.restclient.dto.SourceLocationType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
 
@@ -34,11 +36,11 @@ public class AstClientImpl extends AbstractClientImpl {
     private final AstProperties astProperties;
 
 
-    protected void applyScaResultsFilters(ASTResultsWrapper combinedResults) {
-      //currently do nothing
+    protected void applyScaResultsFilters(ASTResultsWrapper combinedResults, ScanParams scanParams) {
+        //currently do nothing
     }
 
-  
+
     /**
      * Convert Common Client representation of SCA results into an object from this SDK.
      */
@@ -47,17 +49,17 @@ public class AstClientImpl extends AbstractClientImpl {
     protected ASTResultsWrapper toResults(ScanResults scanResults) {
         validateNotNull(scanResults.getAstResults());
 
-        ASTSummaryResults summary = scanResults.getAstResults().getSummary();
- 
+        AstSastSummaryResults summary = scanResults.getAstResults().getSummary();
+
         ModelMapper mapper = new ModelMapper();
         ASTResults astResults = mapper.map(scanResults.getAstResults(), ASTResults.class);
-        
+
         return new ASTResultsWrapper(new SCAResults(), astResults);
     }
 
 
 
-    private void validateNotNull(com.cx.restclient.ast.dto.common.ASTResults astResults) {
+    private void validateNotNull(AstSastResults astResults) {
         if (astResults == null) {
             throw new ASTRuntimeException("AST results are missing.");
         }
@@ -96,7 +98,7 @@ public class AstClientImpl extends AbstractClientImpl {
             remoteRepoInfo.setUrl(scanParams.getRemoteRepoUrl());
             astConfig.setRemoteRepositoryInfo(remoteRepoInfo);
         }
-        
+
         return astConfig;
     }
 
@@ -106,7 +108,7 @@ public class AstClientImpl extends AbstractClientImpl {
         if (scanParams == null) {
             throw new ASTRuntimeException(String.format("%s SCA parameters weren't provided.", ERROR_PREFIX));
         }
-         validateNotEmpty(astProperties.getApiUrl(), "AST API URL");
+        validateNotEmpty(astProperties.getApiUrl(), "AST API URL");
         validateNotEmpty(astProperties.getToken(), "AST Access Token");
         validateNotEmpty(astProperties.getPreset(), "AST preset");
         validateNotEmpty(astProperties.getIncremental(), "Is Incremental flag");

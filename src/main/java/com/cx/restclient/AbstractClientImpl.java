@@ -4,8 +4,6 @@ import com.checkmarx.sdk.dto.Filter;
 import com.checkmarx.sdk.dto.ast.ASTResultsWrapper;
 import com.checkmarx.sdk.dto.ast.ScanParams;
 import com.checkmarx.sdk.exception.ASTRuntimeException;
-
-
 import com.checkmarx.sdk.service.AstClient;
 import com.cx.restclient.CxClientDelegator;
 import com.cx.restclient.ast.dto.common.SummaryResults;
@@ -22,7 +20,7 @@ import java.util.Map;
 
 @Slf4j
 public abstract class AbstractClientImpl implements AstClient {
-    
+
     private static final int SCA_SCAN_INTERVAL_IN_SECONDS = 5;
     protected static final String ERROR_PREFIX = "SCA scan cannot be initiated.";
 
@@ -33,7 +31,7 @@ public abstract class AbstractClientImpl implements AstClient {
         ScanResults scanResults = executeScan(scanConfig);
 
         ASTResultsWrapper scaResults = toResults(scanResults);
-        applyScaResultsFilters(scaResults);
+        applyScaResultsFilters(scaResults, scanParams);
 
         return scaResults;
     }
@@ -54,12 +52,12 @@ public abstract class AbstractClientImpl implements AstClient {
         ScanResults scanResults = executeScan(scanConfig);
 
         ASTResultsWrapper scaResults = toResults(scanResults);
-        applyScaResultsFilters(scaResults);
+        applyScaResultsFilters(scaResults, scanParams);
 
         return scaResults;
     }
-    
-    protected abstract void applyScaResultsFilters(ASTResultsWrapper scaResults);
+
+    protected abstract void applyScaResultsFilters(ASTResultsWrapper scaResults, ScanParams scanParams);
 
     protected abstract ASTResultsWrapper toResults(ScanResults scanResults);
 
