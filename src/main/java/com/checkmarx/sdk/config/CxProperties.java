@@ -6,6 +6,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.validation.annotation.Validated;
 
 import javax.annotation.PostConstruct;
+import java.util.Arrays;
+import java.util.List;
 
 @Component
 @ConfigurationProperties(prefix = "checkmarx")
@@ -52,8 +54,8 @@ public class CxProperties {
     private Integer codeSnippetLength = 2500;
     private String TEAM_PATH_SEPARATOR_9 = "/";
     private String TEAM_PATH_SEPARATOR_8 = "\\";
-
     private String portalUrl;
+    private List<String> engineTypes = Arrays.asList("SAST", "SCA");
 
     // TODO:, JeffA this needs to be removed.
     private String portalPackage = "checkmarx.wsdl.portal";
@@ -381,6 +383,14 @@ public class CxProperties {
 
     public void setSoapScope(String soapScope) {
         this.soapScope = soapScope;
+    }
+
+    public List<String> getEngineTypes() {
+        return engineTypes;
+    }
+
+    public void setEngineTypes(List<String> engineTypes) {
+        this.engineTypes = engineTypes;
     }
 
     public String getTeamPathSeparator(){

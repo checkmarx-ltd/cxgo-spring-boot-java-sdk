@@ -17,7 +17,6 @@ public class CxConfig {
         this.properties = properties;
     }
 
-    // TODO: jeffa, verify that this is used.
     @Bean(name = "cxRestTemplate")
     public RestTemplate getRestTemplate() {
         RestTemplate restTemplate = new RestTemplate();

@@ -7,7 +7,6 @@ import com.checkmarx.sdk.dto.cx.*;
 import com.checkmarx.sdk.dto.filtering.FilterConfiguration;
 import com.checkmarx.sdk.dto.od.*;
 import com.checkmarx.sdk.exception.CheckmarxException;
-import com.google.common.collect.ImmutableMap;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -21,12 +20,10 @@ import org.springframework.util.FileSystemUtils;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
-
 import java.io.*;
-import java.net.URI;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.regex.Pattern;
@@ -38,18 +35,16 @@ import java.util.regex.Pattern;
 public class CxService implements CxClient{
     private static final String UNKNOWN = "-1";
     private static final Integer UNKNOWN_INT = -1;
-    private static final Integer SCAN_STATUS_FINISHED = 7;
-    private static final Integer SCAN_STATUS_CANCELED = 8;
-    private static final Integer SCAN_STATUS_FAILED = 9;
     private static final Logger log = org.slf4j.LoggerFactory.getLogger(CxService.class);
 
     //
     /// Rest API endpoints
     //
-    private static final String TEAMS = "/business-units/business-units";
-    private static final String CREATE_SCAN = "/scans/scans";
-    private static final String UPLOADS_SCAN_FILE = "/files/files/upload-zip";
-    private static final String TRIGGER_SCAN = "/scans/scan";
+    private static final String CREATE_SCAN = "/v1/scans";
+    private static final String SCAN_STATUS = "/v1/scans/{scan_id}/status";
+    private static final String SCAN_RESULTS = "/v1/scans/{scan_id}/results";
+    private static final String SCAN = "/v1/scans/{scan_id}";
+    private static final String SCANS = "/v1/scans";
     private static final String SCAN_QUERIES = "/projects/projects/{project_id}/scans/{scan_id}/queries";
     private static final String SCAN_RESULTS_ENCODED = "/results/results?criteria=%7B%22filters%22%3A%5B%5D%2C%22criteria%22%3A%5B%7B%22key%22%3A%22projectId%22%2C%22value%22%3A%22{project_id}%22%7D%2C%7B%22key%22%3A%22scanId%22%2C%22value%22%3A%22{scan_id}%22%7D%2C%7B%22key%22%3A%22queryId%22%2C%22value%22%3A%22{query_id}%22%7D%5D%2C%22sorting%22%3A%5B%5D%2C%22pagination%22%3A%7B%22currentPage%22%3A{cur_page}%2C%22pageSize%22%3A{page_size}%7D%7D";
     private static final String SCAN_RESULT_NODES_ENCODED = "/nodes/nodes?criteria=%7B%22criteria%22%3A%5B%7B%22key%22%3A%22projectId%22%2C%22value%22%3A%22{project_id}%22%7D%2C%7B%22key%22%3A%22scanId%22%2C%22value%22%3A%22{scan_id}%22%7D%2C%7B%22key%22%3A%22resultId%22%2C%22value%22%3A%22{result_id}%22%7D%5D%2C%22sorting%22%3A%5B%5D%7D";
@@ -58,6 +53,7 @@ public class CxService implements CxClient{
     private static final String CREATE_PROJECT = "/projects/projects";
     private static final String GET_PROJECTS = "/projects/projects?criteria=%7B%22criteria%22%3A%5B%7B%22key%22%3A%22applicationId%22%2C%22value%22%3A%22{app_id}%22%7D%5D%2C%22pagination%22%3A%7B%22currentPage%22%3A{cur_page}%2C%22pageSize%22%3A{page_size}%7D%2C%22sorting%22%3A%5B%5D%7D";
     private static final String GET_SCAN_STATUS = "/scans/scans?criteria=%7B%22filters%22%3A%5B%5D%2C%22criteria%22%3A%5B%7B%22key%22%3A%22projectId%22%2C%22value%22%3A%22{project_id}%22%7D%5D%2C%22sorting%22%3A%5B%5D%2C%22pagination%22%3A%7B%22currentPage%22%3A{cur_page}%2C%22pageSize%22%3A{page_size}%7D%7D";
+    private static final String DEEP_LINK = "/scan/business-unit/%s/application/%s/project/%s/scans/%s";
 
     //
     /// CxOD required extra information for API calls not used by the SAST SDK. This
@@ -96,7 +92,7 @@ public class CxService implements CxClient{
 
     private String createApplication(String appName, String appDesc, String baBuId) {
         log.info("Creating new CxOD application {}.", appName);
-        HttpEntity httpEntity = new HttpEntity<>(
+        HttpEntity<String> httpEntity = new HttpEntity<>(
                 getJSONCreateAppReq(appName, appDesc, baBuId),
                 authClient.createAuthHeaders());
         ResponseEntity<OdApplicationCreate> createResp = restTemplate.exchange(
@@ -105,6 +101,7 @@ public class CxService implements CxClient{
                 httpEntity,
                 OdApplicationCreate.class);
         OdApplicationCreate appCreate = createResp.getBody();
+        assert appCreate != null;
         return appCreate.getData().getBaId();
     }
 
@@ -171,119 +168,89 @@ public class CxService implements CxClient{
         //
         /// Create the project if it doesn't exist.
         //
-        String appID = params.getTeamId();
-        Integer projectID = getProjectId(appID, params.getProjectName());
-        if(projectID == -1) {
-            projectID = Integer.parseInt(createCxODProject(appID, params.getProjectName()));
-        }
-        params.setProjectId(projectID);
-        //
-        /// First, the scan needs to be started
-        //
-        OdScan scan = OdScan.builder()
-                .projectId(params.getProjectId())
-                .build();
-        log.info("Sending scan to CxOD for projectID {}.", params.getProjectId());
-        HttpHeaders headers = authClient.createAuthHeaders();
-        HttpEntity httpEntity = new HttpEntity<>(scan, headers);
-        ResponseEntity<OdScanCreate> createResp = restTemplate.exchange(
-                cxProperties.getUrl().concat(CREATE_SCAN),
-                HttpMethod.PUT,
-                httpEntity,
-                OdScanCreate.class);
-        OdScanCreate scanCreate = createResp.getBody();
-        String scanId = scanCreate.getData().getId();
-        log.info("CxOD started scan with scanId {}.", scanId);
-        //
-        /// Next, the repo to be scanned is uploaded to amazon bucket
-        //
-        log.info("CxOD Uploading Scan file {}.", scanId);
-        OdFileUpload fileUpload = OdFileUpload.builder()
-                .projectId(params.getProjectId().toString(), scanId, "junkstuff")
-                .build();
-        httpEntity = new HttpEntity<>(fileUpload, headers);
-        ResponseEntity<OdScanFileUpload> uploadResp = restTemplate.exchange(
-                cxProperties.getUrl().concat(UPLOADS_SCAN_FILE),
-                HttpMethod.POST,
-                httpEntity,
-                OdScanFileUpload.class);
-        OdScanFileUpload scanUpload = uploadResp.getBody();
-        OdScanFileUploadData data = scanUpload.getData();
-        OdScanFileUploadFields s3Fields = data.getFields();
-        String bucketURL = data.getUrl();
+        try {
+            String appID = params.getTeamId();
+            Integer projectID = getProjectId(appID, params.getProjectName());
+            if (projectID.equals(UNKNOWN_INT)) {
+                projectID = Integer.parseInt(createCxODProject(appID, params.getProjectName()));
+            }
+            params.setProjectId(projectID);
+            /// Create the scan
+            CreateScan scan = CreateScan.builder()
+                    .projectId(params.getProjectId())
+                    .engineTypes(cxProperties.getEngineTypes())
+                    .build();
+            log.info("Sending scan to CxOD for projectID {}.", params.getProjectId());
 
-        // Now upload the file to the bucket
-        File archive = null;
-        if(params.getSourceType() == CxScanParams.Type.FILE) {
-            archive = new File(params.getFilePath());
-        } else {
-            archive = new File(cxRepoFileService.prepareRepoFile(params));
-        }
-        String s3FilePath = postS3File(bucketURL, "archive.zip", archive, s3Fields);
-        FileSystemUtils.deleteRecursively(archive);
+            HttpHeaders headers = authClient.createAuthHeaders();
+            HttpEntity<CreateScan> httpEntity = new HttpEntity<>(scan, headers);
+            ResponseEntity<CreateScanResponse> createResp = restTemplate.exchange(
+                    cxProperties.getUrl().concat(CREATE_SCAN),
+                    HttpMethod.POST,
+                    httpEntity,
+                    CreateScanResponse.class);
+            CreateScanResponse scanCreate = createResp.getBody();
 
-        //
-        /// Finally the scan is kicked off
-        //
-        log.info("CxOD Triggering the scan {}.", scanId);
-        String preset = cxProperties.getScanPreset();
-        String []presets = preset.split(",");
-        OdScanTrigger scanTrigger = OdScanTrigger.builder()
-                .projectId(params.getProjectId().toString(), scanId, s3FilePath, presets)
-                .build();
-        httpEntity = new HttpEntity<>(scanTrigger, headers);
-        ResponseEntity<OdScanTriggerResult> triggerResp = restTemplate.exchange(
-                cxProperties.getUrl().concat(TRIGGER_SCAN),
-                HttpMethod.POST,
-                httpEntity,
-                OdScanTriggerResult.class);
-        // There is currently no use for the triggerResult!
-        OdScanTriggerResult triggerResult = triggerResp.getBody();
-        scanIdMap.put(scanId, params);
-        return Integer.parseInt(scanId);
+            assert scanCreate != null;
+
+            Integer scanId = scanCreate.getScan().getId();
+            log.info("CxOD started scan with scanId {}.", scanId);
+            ///The repo to be scanned is uploaded to amazon bucket
+            log.info("CxOD Uploading Scan file {}.", scanId);
+
+            File archive;
+            if (params.getSourceType() == CxScanParams.Type.FILE) {
+                archive = new File(params.getFilePath());
+            } else {
+                archive = new File(cxRepoFileService.prepareRepoFile(params));
+            }
+
+            uploadScanFile(scanCreate.getStorage(), archive);
+            FileSystemUtils.deleteRecursively(archive);
+            return scanId;
+        }catch (HttpClientErrorException | HttpServerErrorException e){
+            log.error("Http Exception: {}", ExceptionUtils.getRootCauseMessage(e), e);
+            throw new CheckmarxException("Http error occurred");
+        }catch (NullPointerException e){
+            log.error("Null Exception: {}", ExceptionUtils.getRootCauseMessage(e), e);
+            throw new CheckmarxException("NullPointerException occurred");
+        }
     }
 
-    private String postS3File(String targetURL, String filename, File file, OdScanFileUploadFields s3Fields) {
+    /**
+     * Upload Source to pre-signed URL
+     *
+     * @param scanStorage Response Object from CxGo for S3 details
+     * @param file File to upload
+     * @throws CheckmarxException
+     */
+    private void uploadScanFile(Storage scanStorage, File file) throws CheckmarxException{
         try {
+            Fields scanFields = scanStorage.getFields();
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.MULTIPART_FORM_DATA);
             MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
-            body.add("key", s3Fields.getKey());
-            body.add("bucket", s3Fields.getBucket());
-            body.add("X-Amz-Algorithm", s3Fields.getX_Amz_Algorithm());
-            body.add("X-Amz-Credential", s3Fields.getX_Amz_Credential());
-            body.add("X-Amz-Date", s3Fields.getX_Amz_Date());
-            body.add("X-Amz-Security-Token", s3Fields.getX_Amz_Security_Token());
-            body.add("Policy", s3Fields.getPolicy());
-            body.add("X-Amz-Signature", s3Fields.getX_Amz_Signature());
-            // Add the file to upload
-            MultiValueMap<String, String> fileMap = new LinkedMultiValueMap<>();
-            ContentDisposition contentDisposition = ContentDisposition
-                    .builder("form-data")
-                    .name("file")
-                    .filename(filename)
-                    .build();
-            //fileMap.add(HttpHeaders.CONTENT_DISPOSITION, contentDisposition.toString());
-            //byte[] fileContent = Files.readAllBytes(file.toPath());
-            //HttpEntity<byte[]> fileEntity = new HttpEntity<>(fileContent, fileMap);
+            body.add("key", scanFields.getKey());
+            body.add("bucket", scanFields.getBucket());
+            body.add("X-Amz-Algorithm", scanFields.getXAmzAlgorithm());
+            body.add("X-Amz-Credential", scanFields.getXAmzCredential());
+            body.add("X-Amz-Date", scanFields.getXAmzDate());
+            body.add("X-Amz-Security-Token", scanFields.getXAmzSecurityToken());
+            body.add("Policy", scanFields.getPolicy());
+            body.add("X-Amz-Signature", scanFields.getXAmzSignature());
+
             FileSystemResource fsr = new FileSystemResource(file);
             body.add("file", fsr);
             HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
-            ResponseEntity<String> s3Resp = restTemplate.exchange(
-                    targetURL,
+            restTemplate.exchange(
+                    scanStorage.getUrl(),
                     HttpMethod.POST,
                     requestEntity,
                     String.class);
-            URI s3FilePath = s3Resp.getHeaders().getLocation();
-            return java.net.URLDecoder.decode(s3FilePath.toString(), StandardCharsets.UTF_8.name());
         } catch(HttpClientErrorException e) {
-            log.info("CxOD error uploading file.");
-            e.printStackTrace();
-        } catch(UnsupportedEncodingException e) {
-            log.info("CxOD code not decode S3 file path.");
-            e.printStackTrace();
+            log.error("CxOD error uploading file.", e);
+            throw new CheckmarxException("Error Uploading Source to ".concat(scanStorage.getUrl()));
         }
-        return null;
     }
 
     /**
@@ -349,7 +316,7 @@ public class CxService implements CxClient{
     private OdNavigationTree getNavigationTree() throws CheckmarxException {
         HttpEntity httpEntity = new HttpEntity<>(authClient.createAuthHeaders());
         try {
-            log.info("Retrieving OD Navigation Tree");
+            log.debug("Retrieving OD Navigation Tree");
             ResponseEntity<OdNavigationTree> response = restTemplate.exchange(
                     cxProperties.getUrl().concat("/navigation-tree/navigation-tree"),
                     HttpMethod.GET,
@@ -369,48 +336,16 @@ public class CxService implements CxClient{
         return createApplication(teamName, "Generated by CxFlow", parentID);
     }
 
-    private String createCxODBusinessUnit(String parentID, String teamName) {
-        log.info("Create OD Business Unit {} with parentID {}", teamName, parentID);
-        HttpEntity httpEntity = new HttpEntity<>(
-                getJSONCreateBUReq(parentID, teamName),
-                authClient.createAuthHeaders());
-        ResponseEntity<OdBusinessUnitCreate> response = restTemplate.exchange(
-                cxProperties.getUrl().concat(TEAMS),
-                HttpMethod.PUT,
-                httpEntity,
-                OdBusinessUnitCreate.class);
-        OdBusinessUnitCreate buCreate = response.getBody();
-        return buCreate.getData().getId();
-    }
-
-    /**
-     * Generate JSON http request body for creating new CxOD Business Unit
-     *
-     * @return String representation of the token
-     */
-    private String getJSONCreateBUReq(String parentID, String name) {
-        JSONObject requestBody = new JSONObject();
-        JSONObject createBody = new JSONObject();
-        try {
-            createBody.put("buParentId", parentID);
-            createBody.put("buName", name);
-            requestBody.put("businessUnit", createBody);
-        } catch (JSONException e) {
-            log.error("Error generating JSON BU create Request object - JSON object will be empty");
-        }
-        return requestBody.toString();
-    }
-
     @Override
     public ScanResults getReportContentByScanId(Integer scanId, FilterConfiguration filter) throws CheckmarxException {
         ScanResults.ScanResultsBuilder scanResults = ScanResults.builder();
-        CxScanParams params = scanIdMap.get(scanId.toString());
-        Integer projectId = params.getProjectId();
-        String buId = getTeamId(cxProperties.getTeam());
-        String appId = getTeamId(params.getTeamName());
+        Scan scan = getScanDetails(scanId);
+        Integer projectId = scan.getProjectId();
+        Integer buId = scan.getBusinessUnitId();
+        Integer appId = scan.getApplicationId();
         getScanQueries(scanResults, projectId, scanId, buId, appId, filter);
         scanResults.projectId(projectId.toString());
-        String deepLink = cxProperties.getPortalUrl().concat("/scan/business-unit/%s/application/%s/project/%s/scans/%s");
+        String deepLink = cxProperties.getPortalUrl().concat(DEEP_LINK);
         deepLink = String.format(deepLink, buId, appId, projectId, scanId);
         scanResults.link(deepLink);
         return scanResults.build();
@@ -419,8 +354,8 @@ public class CxService implements CxClient{
     private void getScanQueries(ScanResults.ScanResultsBuilder scanResults,
                                     Integer projectId,
                                     Integer scanId,
-                                    String buId,
-                                    String appId,
+                                    Integer buId,
+                                    Integer appId,
                                     FilterConfiguration filter) throws CheckmarxException {
         CxScanSummary scanSummary = new CxScanSummary();
         HttpEntity httpEntity = new HttpEntity<>(null, authClient.createAuthHeaders());
@@ -458,8 +393,30 @@ public class CxService implements CxClient{
         scanResults.additionalDetails(additionalDetails);
     }
 
-    private void getScanResults(String buId,
-                                    String appId,
+
+    public com.checkmarx.sdk.dto.od.ScanResults getScanResults(Integer scanId) throws CheckmarxException {
+        HttpEntity httpEntity = new HttpEntity<>(authClient.createAuthHeaders());
+        try {
+            log.info("Retrieving Scan Results for Scan Id {} ", scanId);
+            //ResponseEntity<com.checkmarx.sdk.dto.od.ScanResults> response = restTemplate.exchange(
+            ResponseEntity<String> response = restTemplate.exchange(
+                    cxProperties.getUrl().concat(SCAN_RESULTS),
+                    HttpMethod.GET,
+                    httpEntity,
+                    //com.checkmarx.sdk.dto.od.ScanResults.class,
+                    String.class,
+                    scanId);
+            return null;
+            //return response.getBody();
+        } catch(HttpStatusCodeException e) {
+            log.error("Error occurred while retrieving the scan results for id {}.", scanId);
+            log.error(ExceptionUtils.getStackTrace(e));
+            throw new CheckmarxException("Error occurred while retrieving the scan status for id ".concat(Integer.toString(scanId)));
+        }
+    }
+
+    private void getScanResults(Integer buId,
+                                    Integer appId,
                                     Integer projectId,
                                     Integer scanId,
                                     String language,
@@ -640,6 +597,7 @@ public class CxService implements CxClient{
         } catch(IOException e) {
             log.error("Error parsing source file: {}.", filePath);
         }
+        assert codeLine != null;
         return codeLine.replace("\r","").replace("\n","");
     }
 
@@ -694,18 +652,19 @@ public class CxService implements CxClient{
         return appList;
     }
 
+    @Override
     public void waitForScanCompletion(Integer scanId) throws CheckmarxException {
-        CxScanParams params = scanIdMap.get(scanId.toString());
-        Integer projectId = params.getProjectId();
-        Integer status = getScanStatus(projectId, scanId);
+        ScanStatus scanStatus = getScanStatusById(scanId);
+        ScanStatus.Status status = scanStatus.getStatus();
         long timer = 0;
         try {
-            while(!status.equals(CxService.SCAN_STATUS_FINISHED) &&
-                    !status.equals(CxService.SCAN_STATUS_CANCELED) &&
-                    !status.equals(CxService.SCAN_STATUS_FAILED)) {
+            while(!status.equals(ScanStatus.Status.COMPLETED) &&
+                    !status.equals(ScanStatus.Status.FAILED)) {
                 Thread.sleep(cxProperties.getScanPolling());
-                status = getScanStatus(projectId, scanId);
+                scanStatus = getScanStatusById(scanId);
+                status = scanStatus.getStatus();
                 timer += cxProperties.getScanPolling();
+                log.info("scanId: {}, status: {}, progress: {}", scanId, scanStatus.getStatus(), scanStatus.getProgress());
                 if(timer >= (cxProperties.getScanTimeout() * 60000)) {
                     log.error("Scan timeout exceeded.  {} minutes", cxProperties.getScanTimeout());
                     throw new CheckmarxException("Timeout exceeded during scan");
@@ -714,22 +673,10 @@ public class CxService implements CxClient{
         } catch(InterruptedException e) {
             log.error("Thread sleep error waiting for scan status!");
         }
-        if (status.equals(CxService.SCAN_STATUS_FAILED) || status.equals(CxService.SCAN_STATUS_CANCELED)) {
+        log.info("scanId: {}, status: {}, progress: {}", scanId, scanStatus.getStatus(), scanStatus.getProgress());
+        if (status.equals(ScanStatus.Status.FAILED)) {
             throw new CheckmarxException("Scan was cancelled or failed");
         }
-    }
-
-    public Integer getScanStatus(Integer projectId, Integer scanId) {
-        log.debug("Retrieving OD Scan List");
-        OdScanList appList = getScanStatusPage(projectId);
-        for(OdScanListDataItem item : appList.getData().getItems()) {
-            if(item.getId().equals(scanId) && item.getStatus().equals("Done")) {
-                return SCAN_STATUS_FINISHED;
-            } else if(item.getId().equals(scanId) && item.getStatus().equals("Project sources scan failed")) {
-                return SCAN_STATUS_FAILED;
-            }
-        }
-        return UNKNOWN_INT;
     }
 
     private OdScanList getScanStatusPage(Integer projectId) {
@@ -779,15 +726,14 @@ public class CxService implements CxClient{
     @Override
     public CxProject getProject(Integer projectId) {
         List<CxProject.CustomField> customFields = new ArrayList<>();
-        CxProject cp = CxProject.builder()
-                .id(projectId)
-                .isPublic(true)
-                .name("CXOD Temporary Project")
-                .teamId(null)
-                .links(null)
-                .customFields(customFields)
-                .build();
-        return cp;
+        CxProject.CxProjectBuilder builder = CxProject.builder();
+        builder.id(projectId);
+        builder.isPublic(true);
+        builder.name("CXOD Temporary Project");
+        builder.teamId(null);
+        builder.links(null);
+        builder.customFields(customFields);
+        return builder.build();
     }
 
     /**
@@ -807,8 +753,6 @@ public class CxService implements CxClient{
 
     @Override
     public Integer getLastScanId(Integer projectId) {
-        // TODO: jeffa remove this old junk
-        //OdScanList appList = getProjectScanList(projectId);
         OdScanList appList = getScanStatusPage(projectId);
         for(OdScanListDataItem item : appList.getData().getItems()) {
             if(item.getStatus().equals("Done")) {
@@ -867,9 +811,69 @@ public class CxService implements CxClient{
         return UNKNOWN;
     }
 
-    @Override
     public Integer getScanStatus(Integer scanId) {
         return UNKNOWN_INT;
+    }
+
+    public ScanStatus getScanStatusById(Integer scanId) throws CheckmarxException {
+        HttpEntity httpEntity = new HttpEntity<>(authClient.createAuthHeaders());
+        try {
+            log.info("Retrieving OD Navigation Tree");
+            ResponseEntity<ScanStatus> response = restTemplate.exchange(
+                    cxProperties.getUrl().concat(SCAN_STATUS),
+                    HttpMethod.GET,
+                    httpEntity,
+                    ScanStatus.class,
+                    scanId);
+            return response.getBody();
+        } catch(HttpStatusCodeException e) {
+            log.error("Error occurred while retrieving the scan status for id {}.", scanId);
+            log.error(ExceptionUtils.getStackTrace(e));
+            throw new CheckmarxException("Error occurred while retrieving the scan status for id ".concat(Integer.toString(scanId)));
+        }
+    }
+
+    public Scan getScanDetails(Integer scanId) throws CheckmarxException {
+        List<Scan> scans = getScans();
+        return scans.stream()
+                .filter(s -> s.getId().equals(scanId))
+                .findFirst()
+                .orElseThrow(() -> new CheckmarxException("Scan was not found with id ".concat(scanId.toString())));
+        /**
+         * TODO Use this logic once the API works on CxGo
+        HttpEntity httpEntity = new HttpEntity<>(authClient.createAuthHeaders());
+        try {
+            log.debug("Retrieving scan with id {}", scanId);
+            ResponseEntity<Scan> response = restTemplate.exchange(
+                    cxProperties.getUrl().concat(SCAN),
+                    HttpMethod.GET,
+                    httpEntity,
+                    Scan.class,
+                    scanId);
+            return response.getBody();
+        } catch(HttpStatusCodeException e) {
+            log.error("Error occurred while retrieving the scan with id {}", scanId);
+            log.error(ExceptionUtils.getStackTrace(e));
+            throw new CheckmarxException("Error occurred while retrieving the scan with id".concat(Integer.toString(scanId)));
+        }
+         */
+    }
+
+    public List<Scan> getScans() throws CheckmarxException {
+        HttpEntity httpEntity = new HttpEntity<>(authClient.createAuthHeaders());
+        try {
+            log.debug("Retrieving all scans");
+            ResponseEntity<Scan[]> response = restTemplate.exchange(
+                    cxProperties.getUrl().concat(SCANS),
+                    HttpMethod.GET,
+                    httpEntity,
+                    Scan[].class);
+            return Arrays.asList(Objects.requireNonNull(response.getBody()));
+        } catch(HttpStatusCodeException e) {
+            log.error("Error occurred while retrieving scans");
+            log.error(ExceptionUtils.getStackTrace(e));
+            throw new CheckmarxException("Error occurred while retrieving scans");
+        }
     }
 
     @Override

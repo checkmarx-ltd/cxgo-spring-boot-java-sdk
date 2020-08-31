@@ -41,6 +41,9 @@ public class CxRepoFileService {
             URI uri = new URI(gitURL);
             CredentialsProvider credentialsProvider = null;
             String token = uri.getUserInfo();
+            if(token == null){
+                token = "";
+            }
             if(token.startsWith("oauth2:")){
                 log.debug("Using gitlab clone");
                 token = token.replace("oauth2:","");
@@ -83,6 +86,5 @@ public class CxRepoFileService {
             throw new CheckmarxException("Unable to clone Git Url.");
         }
     }
-
 
 }

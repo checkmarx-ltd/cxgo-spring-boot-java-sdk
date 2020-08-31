@@ -7,26 +7,34 @@ import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
-@JsonPropertyOrder({
-        "message"
-})
-public class OdScanTriggerResult {
-    @JsonProperty("message")
-    private String message;
+public class CreateScanResponse {
+    @JsonProperty("scan")
+    private Scan scan;
+    @JsonProperty("storage")
+    private Storage storage;
     @JsonIgnore
     private Map<String, Object> additionalProperties = new HashMap<String, Object>();
 
-    @JsonProperty("message")
-    public String getMessage() {
-        return message;
+    @JsonProperty("scan")
+    public Scan getScan() {
+        return scan;
     }
 
-    @JsonProperty("message")
-    public void setData(String data) {
-        this.message = message;
+    @JsonProperty("scan")
+    public void setScan(Scan scan) {
+        this.scan = scan;
+    }
+
+    @JsonProperty("storage")
+    public Storage getStorage() {
+        return storage;
+    }
+
+    @JsonProperty("storage")
+    public void setStorage(Storage storage) {
+        this.storage = storage;
     }
 
     @JsonAnyGetter
