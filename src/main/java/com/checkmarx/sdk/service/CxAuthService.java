@@ -26,7 +26,8 @@ public class CxAuthService implements CxAuthClient {
     //
     /// REST API end-points
     //
-    private static final String GET_SESSION_TOKEN = "/tokens/tokens/auth";
+    private static final String GET_SESSION_TOKEN = "/v1/auth/login";
+    private static final String GRANT_TYPE = "client_credentials";
 
     public CxAuthService(CxProperties cxProperties, @Qualifier("cxRestTemplate") RestTemplate restTemplate) {
         this.cxProperties = cxProperties;
@@ -77,6 +78,7 @@ public class CxAuthService implements CxAuthClient {
     private String getJSONTokenReq() {
         JSONObject requestBody = new JSONObject();
         try {
+            requestBody.put("grant_type", GRANT_TYPE);
             requestBody.put("token", cxProperties.getClientSecret());
         } catch (JSONException e) {
             log.error("Error creating JSON Token Request object - JSON object will be empty");

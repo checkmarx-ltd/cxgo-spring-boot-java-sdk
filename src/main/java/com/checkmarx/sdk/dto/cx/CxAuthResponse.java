@@ -5,19 +5,20 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 public class CxAuthResponse {
 
-    @JsonProperty("AccessToken")
+    @JsonProperty("access_token")
     private String accessToken;
 
-    @JsonProperty("IdToken")
+    @JsonProperty("id_token")
     private String idToken;
 
-    @JsonProperty("ExpiresIn")
+    @JsonProperty("expires_in")
     private Long expiresIn;
 
-    @JsonProperty("TokenType")
+    @JsonProperty("token_type")
     private String tokenType;
 
-    @java.beans.ConstructorProperties({"accessToken", "idToken", "expiresIn", "tokenType"})
+    public CxAuthResponse(){}
+
     public CxAuthResponse(String accessToken, String idToken, Long expiresIn, String tokenType) {
         this.accessToken = accessToken;
         this.idToken = idToken;
@@ -25,60 +26,40 @@ public class CxAuthResponse {
         this.tokenType = tokenType;
     }
 
-    public static CxAuthResponseBuilder builder() {
-        return new CxAuthResponseBuilder();
-    }
-
-    public String toString() {
-        return "CxAuthResponse(accessToken=" + this.getAccessToken() + ", expiresIn=" + this.getExpiresIn() + ", tokenType=" + this.getTokenType() + ")";
-    }
-
     public String getAccessToken() {
-        return this.accessToken;
+        return accessToken;
+    }
+
+    public void setAccessToken(String accessToken) {
+        this.accessToken = accessToken;
     }
 
     public String getIdToken() {
-        return this.idToken;
+        return idToken;
+    }
+
+    public void setIdToken(String idToken) {
+        this.idToken = idToken;
     }
 
     public Long getExpiresIn() {
-        return this.expiresIn;
+        return expiresIn;
+    }
+
+    public void setExpiresIn(Long expiresIn) {
+        this.expiresIn = expiresIn;
     }
 
     public String getTokenType() {
-        return this.tokenType;
+        return tokenType;
     }
 
-    public static class CxAuthResponseBuilder {
-        private String accessToken;
-        private String idToken;
-        private Long expiresIn;
-        private String tokenType;
-
-        CxAuthResponseBuilder() {
-        }
-
-        public CxAuthResponse.CxAuthResponseBuilder accessToken(String accessToken) {
-            this.accessToken = accessToken;
-            return this;
-        }
-
-        public CxAuthResponse.CxAuthResponseBuilder expiresIn(Long expiresIn) {
-            this.expiresIn = expiresIn;
-            return this;
-        }
-
-        public CxAuthResponse.CxAuthResponseBuilder tokenType(String tokenType) {
-            this.tokenType = tokenType;
-            return this;
-        }
-
-        public CxAuthResponse build() {
-            return new CxAuthResponse(accessToken, idToken, expiresIn, tokenType);
-        }
-
-        public String toString() {
-            return "CxAuthResponse.CxAuthResponseBuilder(accessToken=" + this.accessToken + ", expiresIn=" + this.expiresIn + ", tokenType=" + this.tokenType + ")";
-        }
+    public void setTokenType(String tokenType) {
+        this.tokenType = tokenType;
     }
+
+    public String toString() {
+        return "CxAuthResponse(accessToken=XXXXX,"  + ", expiresIn=" + this.getExpiresIn() + ", tokenType=" + this.getTokenType() + ")";
+    }
+
 }
