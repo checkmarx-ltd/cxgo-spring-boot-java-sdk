@@ -3,7 +3,13 @@ package com.checkmarx.sdk.service;
 import com.checkmarx.sdk.config.CxProperties;
 import com.checkmarx.sdk.dto.cx.CxScanParams;
 import com.checkmarx.sdk.exception.CheckmarxException;
+import com.checkmarx.sdk.utils.ScanUtils;
 import com.checkmarx.sdk.utils.ZipUtils;
+import groovy.lang.Binding;
+import groovy.lang.GroovyRuntimeException;
+import groovy.util.GroovyScriptEngine;
+import groovy.util.ResourceException;
+import groovy.util.ScriptException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.eclipse.jgit.api.Git;
@@ -74,10 +80,11 @@ public class CxRepoFileService {
             if(params.getFileExclude() != null && !params.getFileExclude().isEmpty()){
                 exclusions = String.join(",",params.getFileExclude());
             }
+            runPostCloneScript(params, srcPath);
             ZipUtils.zipFile(srcPath, cxZipFile, exclusions);
             try {
                 FileUtils.deleteDirectory(pathFile);
-            } catch (IOException e){ //Do not thro
+            } catch (IOException e){
                 log.warn("Error deleting file {} - {}", pathFile, ExceptionUtils.getRootCauseMessage(e));
             }
             return cxZipFile;
@@ -87,4 +94,21 @@ public class CxRepoFileService {
         }
     }
 
+    private void runPostCloneScript(CxScanParams params, String path) {
+        if (!ScanUtils.empty(cxProperties.getPostCloneScript())) {
+            try {
+                Binding binding = new Binding();
+                binding.setProperty("params", params);
+                binding.setVariable("path", path);
+                File script = new File(cxProperties.getPostCloneScript());
+                String scriptName = script.getName();
+                String scriptDir = script.getParent();
+                String[] roots = new String[]{scriptDir};
+                GroovyScriptEngine gse = new GroovyScriptEngine(roots);
+                gse.run(scriptName, binding);
+            } catch (GroovyRuntimeException | IOException | ResourceException | ScriptException e) {
+                log.error("Error occurred while executing Post Clone Script {}", ExceptionUtils.getMessage(e), e);
+            }
+        }
+    }
 }

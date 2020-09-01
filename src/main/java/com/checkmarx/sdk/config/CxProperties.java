@@ -56,6 +56,8 @@ public class CxProperties {
     private String TEAM_PATH_SEPARATOR_8 = "\\";
     private String portalUrl;
     private List<String> engineTypes = Arrays.asList("SAST", "SCA");
+    private String postCloneScript;
+    private Boolean enableShardManager = false;
 
     // TODO:, JeffA this needs to be removed.
     private String portalPackage = "checkmarx.wsdl.portal";
@@ -391,6 +393,22 @@ public class CxProperties {
 
     public void setEngineTypes(List<String> engineTypes) {
         this.engineTypes = engineTypes;
+    }
+
+    public String getPostCloneScript() {
+        return postCloneScript;
+    }
+
+    public void setPostCloneScript(String postCloneScript) {
+        this.postCloneScript = postCloneScript;
+    }
+
+    public Boolean getEnableShardManager() {
+        return enableShardManager;
+    }
+
+    public void setEnableShardManager(Boolean enableShardManager) {
+        this.enableShardManager = enableShardManager;
     }
 
     public String getTeamPathSeparator(){
