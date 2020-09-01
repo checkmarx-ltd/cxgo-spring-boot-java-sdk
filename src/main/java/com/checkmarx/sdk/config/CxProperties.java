@@ -410,7 +410,7 @@ public class CxProperties {
     public void setEnableShardManager(Boolean enableShardManager) {
         this.enableShardManager = enableShardManager;
     }
-
+  
     public String getTeamPathSeparator(){
         if(version < 9.0){
             return TEAM_PATH_SEPARATOR_8;
