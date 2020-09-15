@@ -108,4 +108,5 @@ public class CxServiceIT {
             fail("Unexpected CheckmarxException");
         }
     }
+
 }
