@@ -834,13 +834,6 @@ public class CxService implements CxClient{
     }
 
     public Scan getScanDetails(Integer scanId) throws CheckmarxException {
-        List<Scan> scans = getScans();
-        return scans.stream()
-                .filter(s -> s.getId().equals(scanId))
-                .findFirst()
-                .orElseThrow(() -> new CheckmarxException("Scan was not found with id ".concat(scanId.toString())));
-        /**
-         * TODO Use this logic once the API works on CxGo
         HttpEntity httpEntity = new HttpEntity<>(authClient.createAuthHeaders());
         try {
             log.debug("Retrieving scan with id {}", scanId);
@@ -856,7 +849,6 @@ public class CxService implements CxClient{
             log.error(ExceptionUtils.getStackTrace(e));
             throw new CheckmarxException("Error occurred while retrieving the scan with id".concat(Integer.toString(scanId)));
         }
-         */
     }
 
     public List<Scan> getScans() throws CheckmarxException {
