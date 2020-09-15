@@ -97,16 +97,13 @@ public class CxServiceIT {
             params.setSourceType(CxScanParams.Type.GIT);
             //run the scan and wait for it to finish
             Integer x = service.createScan(params, "CxFlow Scan");
-            //TODO SKIPPING service.waitForScanCompletion(x);
-            //Test retrieving scan details
-            Scan scan = service.getScanDetails(x);
-            assertNotNull(scan);
+            service.waitForScanCompletion(x);
             FilterConfiguration filterConfiguration = FilterConfiguration.builder()
                     .simpleFilters(Collections.singletonList(new Filter(Filter.Type.SEVERITY, "High")))
                     .build();
             //generate the results
-            //TODO SKIPPING ScanResults results = service.getReportContentByScanId(x, filterConfiguration);
-            //assertNotNull(results);
+            ScanResults results = service.getReportContentByScanId(x, filterConfiguration);
+            assertNotNull(results);
         }catch (CheckmarxException e){
             fail("Unexpected CheckmarxException");
         }
