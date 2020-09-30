@@ -306,7 +306,7 @@ public class CxScanParams {
                 ", scanPreset='" + scanPreset + '\'' +
                 ", scanConfiguration='" + scanConfiguration + '\'' +
                 ", sourceType=" + sourceType +
-                ", gitUrl='" + gitUrl + '\'' +
+                //", gitUrl='" + gitUrl + '\'' + REMOVING DUE TO CREDENTIAL LEAKAGE
                 ", filePath='" + filePath + '\'' +
                 ", customFields=" + customFields +
                 ", postAction='" + postAction + '\'' +

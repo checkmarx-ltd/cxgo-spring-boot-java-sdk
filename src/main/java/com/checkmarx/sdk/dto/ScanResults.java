@@ -14,9 +14,7 @@ import org.modelmapper.Conditions;
 import org.modelmapper.ModelMapper;
 
 import java.beans.ConstructorProperties;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 /**
  * Representation of Issues for a particular product/scan
@@ -25,7 +23,7 @@ public class ScanResults{
 
     private Boolean osa = false;
     private String  projectId;
-    private Integer SastScanId;
+    private Integer sastScanId;
     private String  team;
     private String  project;
     private String  link;
@@ -68,11 +66,11 @@ public class ScanResults{
     }
 
     public Integer getSastScanId() {
-        return SastScanId;
+        return sastScanId;
     }
 
     public void setSastScanId(Integer sastScanId) {
-        SastScanId = sastScanId;
+        this.sastScanId = sastScanId;
     }
 
     public SCAResults getScaResults() {
@@ -348,6 +346,9 @@ public class ScanResults{
         }
 
         public Map<String, Object> getAdditionalDetails() {
+            if(this.additionalDetails == null){
+                this.additionalDetails = new HashMap<>();
+            }
             return this.additionalDetails;
         }
 

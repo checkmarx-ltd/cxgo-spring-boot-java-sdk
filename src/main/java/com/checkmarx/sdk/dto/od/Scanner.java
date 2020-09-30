@@ -14,6 +14,8 @@ public class Scanner {
     private String firstName;
     @JsonProperty("last_name")
     private String lastName;
+    @JsonProperty("token_name")
+    private String tokenName;
     @JsonIgnore
     private Map<String, Object> additionalProperties = new HashMap<String, Object>();
 
@@ -45,6 +47,16 @@ public class Scanner {
     @JsonProperty("last_name")
     public void setLastName(String lastName) {
         this.lastName = lastName;
+    }
+
+    @JsonProperty("token_name")
+    public String getTokenName() {
+        return tokenName;
+    }
+
+    @JsonProperty("token_name")
+    public void setTokenName(String tokenName) {
+        this.tokenName = tokenName;
     }
 
     @JsonAnyGetter

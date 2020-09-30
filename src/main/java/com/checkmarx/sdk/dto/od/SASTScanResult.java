@@ -14,7 +14,7 @@ public class SASTScanResult {
     @JsonProperty("status")
     private Status status;
     @JsonProperty("state")
-    private State state;
+    private Integer state;
     @JsonProperty("severity")
     private Severity severity;
     @JsonProperty("similarity_id")
@@ -33,6 +33,8 @@ public class SASTScanResult {
     private String languageName;
     @JsonProperty("vulnerability_type")
     private String vulnerabilityType;
+    @JsonProperty("cwe")
+    private String cwe;
     @JsonProperty("created_at")
     private String createdAt;
     @JsonProperty("updated_at")
@@ -71,12 +73,12 @@ public class SASTScanResult {
     }
 
     @JsonProperty("state")
-    public State getState() {
+    public Integer getState() {
         return state;
     }
 
     @JsonProperty("state")
-    public void setState(State state) {
+    public void setState(Integer state) {
         this.state = state;
     }
 
@@ -170,6 +172,14 @@ public class SASTScanResult {
         this.vulnerabilityType = vulnerabilityType;
     }
 
+    public String getCwe() {
+        return cwe;
+    }
+
+    public void setCwe(String cwe) {
+        this.cwe = cwe;
+    }
+
     @JsonProperty("created_at")
     public String getCreatedAt() {
         return createdAt;
@@ -233,27 +243,6 @@ public class SASTScanResult {
         }
 
         public void setStatus(String s) {
-            this.s = s;
-        }
-    }
-
-    public enum State {
-        TO_VERIFY("TO_VERIFY"),
-        NOT_EXPLOITABLE("NOT_EXPLOITABLE"),
-        CONFIRMED("CONFIRMED"),
-        URGENT("URGENT");
-
-        private String s;
-
-        private State(String s) {
-            this.s = s;
-        }
-
-        public String getState() {
-            return s;
-        }
-
-        public void setState(String s) {
             this.s = s;
         }
     }
