@@ -8,7 +8,7 @@
 		<version>2.2.6.RELEASE</version>
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
-	<groupId>com.github.checkmarx-ts</groupId>
+	<groupId>com.github.checkmarx-ltd</groupId>
 	<artifactId>cxgo-spring-boot-sdk</artifactId>
 	<version>0.1.38</version>
 	<name>cxgo-spring-boot-sdk</name>
