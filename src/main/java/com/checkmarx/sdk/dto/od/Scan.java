@@ -11,7 +11,9 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class Scan {
+    /**
 
+     */
     @JsonProperty("id")
     private Integer id;
     @JsonProperty("status")
@@ -24,26 +26,17 @@ public class Scan {
     private List<String> engineTypes = null;
     @JsonProperty("risk_level")
     private String riskLevel;
-    @JsonProperty("high_severities_count")
-    private Integer highSeveritiesCount;
-    @JsonProperty("medium_severities_count")
-    private Integer mediumSeveritiesCount;
-    @JsonProperty("low_severities_count")
-    private Integer lowSeveritiesCount;
-    @JsonProperty("scanner")
-    private Scanner scanner;
-    @JsonProperty("created_at")
-    private String createdAt;
-    @JsonProperty("launched_at")
-    private String launchedAt;
-    @JsonProperty("allowed_to_delete")
-    private Boolean allowedToDelete;
     @JsonProperty("project_id")
     private Integer projectId;
     @JsonProperty("application_id")
     private Integer applicationId;
     @JsonProperty("business_unit_id")
     private Integer businessUnitId;
+    @JsonProperty("scanner")
+    private Scanner scanner;
+    @JsonProperty("engines")
+    private Map<String, Object> engines;
+
     @JsonIgnore
     private Map<String, Object> additionalProperties = new HashMap<String, Object>();
 
@@ -107,36 +100,6 @@ public class Scan {
         this.riskLevel = riskLevel;
     }
 
-    @JsonProperty("high_severities_count")
-    public Integer getHighSeveritiesCount() {
-        return highSeveritiesCount;
-    }
-
-    @JsonProperty("high_severities_count")
-    public void setHighSeveritiesCount(Integer highSeveritiesCount) {
-        this.highSeveritiesCount = highSeveritiesCount;
-    }
-
-    @JsonProperty("medium_severities_count")
-    public Integer getMediumSeveritiesCount() {
-        return mediumSeveritiesCount;
-    }
-
-    @JsonProperty("medium_severities_count")
-    public void setMediumSeveritiesCount(Integer mediumSeveritiesCount) {
-        this.mediumSeveritiesCount = mediumSeveritiesCount;
-    }
-
-    @JsonProperty("low_severities_count")
-    public Integer getLowSeveritiesCount() {
-        return lowSeveritiesCount;
-    }
-
-    @JsonProperty("low_severities_count")
-    public void setLowSeveritiesCount(Integer lowSeveritiesCount) {
-        this.lowSeveritiesCount = lowSeveritiesCount;
-    }
-
     @JsonProperty("scanner")
     public Scanner getScanner() {
         return scanner;
@@ -145,36 +108,6 @@ public class Scan {
     @JsonProperty("scanner")
     public void setScanner(Scanner scanner) {
         this.scanner = scanner;
-    }
-
-    @JsonProperty("created_at")
-    public String getCreatedAt() {
-        return createdAt;
-    }
-
-    @JsonProperty("created_at")
-    public void setCreatedAt(String createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    @JsonProperty("launched_at")
-    public String getLaunchedAt() {
-        return launchedAt;
-    }
-
-    @JsonProperty("launched_at")
-    public void setLaunchedAt(String launchedAt) {
-        this.launchedAt = launchedAt;
-    }
-
-    @JsonProperty("allowed_to_delete")
-    public Boolean getAllowedToDelete() {
-        return allowedToDelete;
-    }
-
-    @JsonProperty("allowed_to_delete")
-    public void setAllowedToDelete(Boolean allowedToDelete) {
-        this.allowedToDelete = allowedToDelete;
     }
 
     @JsonProperty("project_id")
@@ -205,6 +138,14 @@ public class Scan {
     @JsonProperty("business_unit_id")
     public void setBusinessUnitId(Integer businessUnitId) {
         this.businessUnitId = businessUnitId;
+    }
+
+    public Map<String, Object> getEngines() {
+        return engines;
+    }
+
+    public void setEngines(Map<String, Object> engines) {
+        this.engines = engines;
     }
 
     @JsonAnyGetter

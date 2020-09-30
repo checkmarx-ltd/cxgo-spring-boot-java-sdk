@@ -12,20 +12,30 @@ public class ScanResults {
     @JsonProperty("sast")
     private List<SASTScanResult> sast;
 
-    //@JsonProperty("sca")
-   //private SASTScanResult sast;
+    @JsonProperty("sca")
+    private List<SCAScanResult> sca;
 
     @JsonIgnore
     private Map<String, Object> additionalProperties = new HashMap<String, Object>();
+
+    @JsonProperty("sast")
+    public void setSast(List<SASTScanResult> sast) {
+        this.sast = sast;
+    }
 
     @JsonProperty("sast")
     public List<SASTScanResult> getSast() {
         return sast;
     }
 
-    @JsonProperty("sast")
-    public void setSast(List<SASTScanResult> sast) {
-        this.sast = sast;
+    @JsonProperty("sca")
+    public void setSca(List<SCAScanResult> sca) {
+        this.sca = sca;
+    }
+
+    @JsonProperty("sca")
+    public List<SCAScanResult> getSca() {
+        return sca;
     }
 
     @JsonAnyGetter

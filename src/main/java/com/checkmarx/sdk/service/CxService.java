@@ -1,16 +1,22 @@
 package com.checkmarx.sdk.service;
 
+import com.checkmarx.sdk.config.Constants;
 import com.checkmarx.sdk.config.CxProperties;
 import com.checkmarx.sdk.dto.Filter;
 import com.checkmarx.sdk.dto.ScanResults;
+import com.checkmarx.sdk.dto.ast.SCAResults;
+import com.checkmarx.sdk.dto.ast.Summary;
 import com.checkmarx.sdk.dto.cx.*;
 import com.checkmarx.sdk.dto.filtering.FilterConfiguration;
 import com.checkmarx.sdk.dto.od.*;
 import com.checkmarx.sdk.exception.CheckmarxException;
+import com.cx.restclient.ast.dto.sca.report.Finding;
+import com.cx.restclient.ast.dto.sca.report.Package;
+import com.cx.restclient.dto.scansummary.Severity;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.json.JSONException;
 import org.json.JSONObject;
-import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.io.FileSystemResource;
@@ -19,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.FileSystemUtils;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.util.StringUtils;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.HttpStatusCodeException;
@@ -27,34 +34,43 @@ import java.io.*;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * Class used to orchestrate submitting scans and retrieving results
  */
 @Service
+@Slf4j
 public class CxService implements CxClient{
     private static final String UNKNOWN = "-1";
     private static final Integer UNKNOWN_INT = -1;
-    private static final Logger log = org.slf4j.LoggerFactory.getLogger(CxService.class);
 
     //
     /// Rest API endpoints
     //
     private static final String CREATE_SCAN = "/v1/scans";
     private static final String SCAN_STATUS = "/v1/scans/{scan_id}/status";
-    private static final String SCAN_RESULTS = "/v1/scans/{scan_id}/results";
     private static final String SCAN = "/v1/scans/{scan_id}";
     private static final String SCANS = "/v1/scans";
-    private static final String SCAN_QUERIES = "/projects/projects/{project_id}/scans/{scan_id}/queries";
-    private static final String SCAN_RESULTS_ENCODED = "/results/results?criteria=%7B%22filters%22%3A%5B%5D%2C%22criteria%22%3A%5B%7B%22key%22%3A%22projectId%22%2C%22value%22%3A%22{project_id}%22%7D%2C%7B%22key%22%3A%22scanId%22%2C%22value%22%3A%22{scan_id}%22%7D%2C%7B%22key%22%3A%22queryId%22%2C%22value%22%3A%22{query_id}%22%7D%5D%2C%22sorting%22%3A%5B%5D%2C%22pagination%22%3A%7B%22currentPage%22%3A{cur_page}%2C%22pageSize%22%3A{page_size}%7D%7D";
-    private static final String SCAN_RESULT_NODES_ENCODED = "/nodes/nodes?criteria=%7B%22criteria%22%3A%5B%7B%22key%22%3A%22projectId%22%2C%22value%22%3A%22{project_id}%22%7D%2C%7B%22key%22%3A%22scanId%22%2C%22value%22%3A%22{scan_id}%22%7D%2C%7B%22key%22%3A%22resultId%22%2C%22value%22%3A%22{result_id}%22%7D%5D%2C%22sorting%22%3A%5B%5D%7D";
+    private static final String SCAN_RESULTS_ENCODED = "/results/results?criteria=%7B%22criteria%22%3A%5B%7B%22key%22%3A%22projectId%22%2C%22value%22%3A%22{project_id}%22%7D%2C%7B%22key%22%3A%22scanId%22%2C%22value%22%3A%22{scan_id}%22%7D%5D%2C%22pagination%22%3A%7B%22currentPage%22%3A{current_page%2C%22pageSize%22%3A{page_size}%7D%7D";
+    private static final String SCAN_RESULTS = "/v1/scans/{scan_id}/results";
     private static final String SCAN_FILE = "/projects/projects/{project_id}/scans/{scan_id}/files?filePath={file_path};";
     private static final String CREATE_APPLICATION = "/applications/applications";
     private static final String CREATE_PROJECT = "/projects/projects";
     private static final String GET_PROJECTS = "/projects/projects?criteria=%7B%22criteria%22%3A%5B%7B%22key%22%3A%22applicationId%22%2C%22value%22%3A%22{app_id}%22%7D%5D%2C%22pagination%22%3A%7B%22currentPage%22%3A{cur_page}%2C%22pageSize%22%3A{page_size}%7D%2C%22sorting%22%3A%5B%5D%7D";
     private static final String GET_SCAN_STATUS = "/scans/scans?criteria=%7B%22filters%22%3A%5B%5D%2C%22criteria%22%3A%5B%7B%22key%22%3A%22projectId%22%2C%22value%22%3A%22{project_id}%22%7D%5D%2C%22sorting%22%3A%5B%5D%2C%22pagination%22%3A%7B%22currentPage%22%3A{cur_page}%2C%22pageSize%22%3A{page_size}%7D%7D";
     private static final String DEEP_LINK = "/scan/business-unit/%s/application/%s/project/%s/scans/%s";
+    private static final String SCA_DEEP_LINK = "/scan/business-unit/%s/application/%s/project/%s";
+    private static final String ADDITIONAL_DETAILS_KEY = "results";
 
+    private final Map<String, Integer> STATE_MAP = Collections.unmodifiableMap(new HashMap<String, Integer>() {
+        {
+            put("TO_VERIFY", 1);
+            put("NOT_EXPLOITABLE", 2);
+            put("CONFIRMED", 3);
+            put("URGENT", 4);
+        }
+    });
     //
     /// CxOD required extra information for API calls not used by the SAST SDK. This
     /// data structure is used to capture that information as CxService calls are made
@@ -76,22 +92,18 @@ public class CxService implements CxClient{
     private final CxProperties cxProperties;
     private final CxAuthClient authClient;
     private final RestTemplate restTemplate;
-    private Map<String, Object> codeCache = new HashMap<String, Object>();
-    private final FilterValidator filterValidator;
+    private Map<String, Object> codeCache = new HashMap<>();
     private CxRepoFileService cxRepoFileService;
 
-    public CxService(CxAuthClient authClient,
-                     CxProperties cxProperties,
-                     @Qualifier("cxRestTemplate") RestTemplate restTemplate,
-                     FilterValidator filterValidator) {
-        this.authClient = authClient;
+    public CxService(CxProperties cxProperties, CxAuthClient authClient,
+                     @Qualifier("cxRestTemplate") RestTemplate restTemplate) {
         this.cxProperties = cxProperties;
+        this.authClient = authClient;
         this.restTemplate = restTemplate;
-        this.filterValidator = filterValidator;
     }
 
     private String createApplication(String appName, String appDesc, String baBuId) {
-        log.info("Creating new CxOD application {}.", appName);
+        log.info("Creating new CxGo application {}.", appName);
         HttpEntity<String> httpEntity = new HttpEntity<>(
                 getJSONCreateAppReq(appName, appDesc, baBuId),
                 authClient.createAuthHeaders());
@@ -126,10 +138,10 @@ public class CxService implements CxClient{
         return requestBody.toString();
     }
 
-    private String createCxODProject(String appId, String projectName) {
-        log.info("Creating new CxOD project.");
-        HttpEntity httpEntity = new HttpEntity<>(
-                getJSONCreateProjectReq(appId, projectName),
+    private String createCxGoProject(String appId, String projectName, String presets) {
+        log.info("Creating new CxGo project.");
+        HttpEntity<?> httpEntity = new HttpEntity<>(
+                getJSONCreateProjectReq(appId, projectName, presets),
                 authClient.createAuthHeaders());
         ResponseEntity<OdProjectCreate> createResp = restTemplate.exchange(
                 cxProperties.getUrl().concat(CREATE_PROJECT),
@@ -145,14 +157,16 @@ public class CxService implements CxClient{
      *
      * @return String representation of the process
      */
-    private String getJSONCreateProjectReq(String appId, String projectName) {
+    private String getJSONCreateProjectReq(String appId, String projectName, String preset) {
         JSONObject requestBody = new JSONObject();
         JSONObject createBody = new JSONObject();
         try {
             createBody.put("businessApplicationId", appId);
             createBody.put("name", projectName);
             createBody.put("description", "");
-            String preset = cxProperties.getScanPreset();
+            if(StringUtils.isEmpty(preset)){
+                preset = cxProperties.getScanPreset();
+            }
             String [] presets = preset.split(",");
             createBody.put("typeIds", presets);
             createBody.put("criticality", 5);
@@ -172,7 +186,7 @@ public class CxService implements CxClient{
             String appID = params.getTeamId();
             Integer projectID = getProjectId(appID, params.getProjectName());
             if (projectID.equals(UNKNOWN_INT)) {
-                projectID = Integer.parseInt(createCxODProject(appID, params.getProjectName()));
+                projectID = Integer.parseInt(createCxGoProject(appID, params.getProjectName(), params.getScanPreset()));
             }
             params.setProjectId(projectID);
             /// Create the scan
@@ -180,7 +194,7 @@ public class CxService implements CxClient{
                     .projectId(params.getProjectId())
                     .engineTypes(cxProperties.getEngineTypes())
                     .build();
-            log.info("Sending scan to CxOD for projectID {}.", params.getProjectId());
+            log.info("Sending scan to CxGo for projectID {}.", params.getProjectId());
 
             HttpHeaders headers = authClient.createAuthHeaders();
             HttpEntity<CreateScan> httpEntity = new HttpEntity<>(scan, headers);
@@ -194,9 +208,9 @@ public class CxService implements CxClient{
             assert scanCreate != null;
 
             Integer scanId = scanCreate.getScan().getId();
-            log.info("CxOD started scan with scanId {}.", scanId);
+            log.info("CxGo started scan with scanId {}.", scanId);
             ///The repo to be scanned is uploaded to amazon bucket
-            log.info("CxOD Uploading Scan file {}.", scanId);
+            log.info("CxGo Uploading Scan file {}.", scanId);
 
             File archive;
             if (params.getSourceType() == CxScanParams.Type.FILE) {
@@ -248,7 +262,7 @@ public class CxService implements CxClient{
                     requestEntity,
                     String.class);
         } catch(HttpClientErrorException e) {
-            log.error("CxOD error uploading file.", e);
+            log.error("CxGo error uploading file.", e);
             throw new CheckmarxException("Error Uploading Source to ".concat(scanStorage.getUrl()));
         }
     }
@@ -314,7 +328,7 @@ public class CxService implements CxClient{
     }
 
     private OdNavigationTree getNavigationTree() throws CheckmarxException {
-        HttpEntity httpEntity = new HttpEntity<>(authClient.createAuthHeaders());
+        HttpEntity<?> httpEntity = new HttpEntity<>(authClient.createAuthHeaders());
         try {
             log.debug("Retrieving OD Navigation Tree");
             ResponseEntity<OdNavigationTree> response = restTemplate.exchange(
@@ -338,199 +352,244 @@ public class CxService implements CxClient{
 
     @Override
     public ScanResults getReportContentByScanId(Integer scanId, FilterConfiguration filter) throws CheckmarxException {
-        ScanResults.ScanResultsBuilder scanResults = ScanResults.builder();
+        ScanResults.ScanResultsBuilder results = ScanResults.builder();
         Scan scan = getScanDetails(scanId);
         Integer projectId = scan.getProjectId();
         Integer buId = scan.getBusinessUnitId();
         Integer appId = scan.getApplicationId();
-        getScanQueries(scanResults, projectId, scanId, buId, appId, filter);
-        scanResults.projectId(projectId.toString());
+
+        //CompletableFuture<Map<String, OdScanResultItem>> scanResultItemsFuture = resultService.getScanResultsPage(projectId, scanId);
+        //CompletableFuture<com.checkmarx.sdk.dto.od.ScanResults> scanResultsFuture = resultService.getScanResults(scanId);
+        Map<String, OdScanResultItem> scanResultItems = getScanResultsPage(projectId, scanId);
+        com.checkmarx.sdk.dto.od.ScanResults scanResults = getScanResults(scanId);
+        /*CompletableFuture.allOf(scanResultItemsFuture, scanResultsFuture);
+        if(scanResultItemsFuture.isCompletedExceptionally() || scanResultsFuture.isCompletedExceptionally()){
+            throw new CheckmarxException("Error retrieving results for Scan ".concat(scanId.toString()));
+        }
+
+        com.checkmarx.sdk.dto.od.ScanResults scanResults = scanResultsFuture.join();
+        Map<String, OdScanResultItem> scanResultItems = scanResultItemsFuture.join();
+        */
+
+        List<ScanResults.XIssue> xIssues = new ArrayList<>();
+        //SAST
+        if(scanResults.getSast() != null){
+            Map<String, Integer> policyCount = new HashMap<>();
+            log.info("Processing SAST results");
+            scanResults.getSast().stream()
+                  .filter( i -> filterIssue(i, filter))
+                  .forEach( i -> handleSastIssue(xIssues, i, scanResultItems, projectId, scanId, policyCount));
+            CxScanSummary scanSummary = new CxScanSummary();
+            Map<String, Object> sast = (Map<String, Object>) scan.getEngines().get("sast");
+            if(sast != null){
+                int high = (int) sast.get("high_severities_count");
+                int med = (int) sast.get("medium_severities_count");
+                int low = (int) sast.get("low_severities_count");
+                scanSummary.setHighSeverity(high);
+                scanSummary.setMediumSeverity(med);
+                scanSummary.setLowSeverity(low);
+                scanSummary.setInfoSeverity(0); // Does not exist
+            }
+            Map<String, Object> flowSummary = new HashMap<>();
+            flowSummary.put(Constants.SUMMARY_KEY, policyCount);
+            results.additionalDetails(flowSummary);
+            results.scanSummary(scanSummary);
+        }
+
+        //SCA
+        if(scanResults.getSca() != null){
+            List<Finding> findings = new ArrayList<>();
+            List<Package> packages = new ArrayList<>();
+
+            log.info("Processing SCA results");
+            scanResults.getSca().stream()
+                    .filter( i -> filterIssue(i, filter))
+                    .forEach( i -> handleScaIssue(xIssues, findings, packages, i));
+            SCAResults scaResults = new SCAResults();
+            Summary summary = new Summary();
+
+            scaResults.setFindings(findings);
+            scaResults.setPackages(packages);
+            if(scanResults.getSca() != null || !scanResults.getSca().isEmpty()) {
+                scaResults.setScanId(scanResults.getSca().get(0).getScanId().toString());
+            }
+            Map<String, Object> sca = (Map<String, Object>) scan.getEngines().get("sca");
+            if(sca != null){
+                int high = (int) sca.get("high_severities_count");
+                int med = (int) sca.get("medium_severities_count");
+                int low = (int) sca.get("low_severities_count");
+                Map<Filter.Severity, Integer> severityMap = new HashMap<>();
+                severityMap.put(Filter.Severity.HIGH, high);
+                severityMap.put(Filter.Severity.MEDIUM, med);
+                severityMap.put(Filter.Severity.LOW, low);
+                severityMap.put(Filter.Severity.INFO, 0);
+                summary.setFindingCounts(severityMap);
+            }
+            scaResults.setSummary(summary);
+            String scaDeepLink = cxProperties.getPortalUrl().concat(SCA_DEEP_LINK);
+            scaDeepLink = String.format(scaDeepLink, buId, appId, projectId, scanId);
+            scaResults.setWebReportLink(scaDeepLink);
+            results.scaResults(scaResults);
+
+        }
+
+        results.xIssues(xIssues);
+        results.projectId(projectId.toString());
         String deepLink = cxProperties.getPortalUrl().concat(DEEP_LINK);
         deepLink = String.format(deepLink, buId, appId, projectId, scanId);
-        scanResults.link(deepLink);
-        return scanResults.build();
+        results.link(deepLink);
+
+        return results.build();
     }
 
-    private void getScanQueries(ScanResults.ScanResultsBuilder scanResults,
-                                    Integer projectId,
-                                    Integer scanId,
-                                    Integer buId,
-                                    Integer appId,
-                                    FilterConfiguration filter) throws CheckmarxException {
-        CxScanSummary scanSummary = new CxScanSummary();
-        HttpEntity httpEntity = new HttpEntity<>(null, authClient.createAuthHeaders());
-        ResponseEntity<OdScanQueries> response = restTemplate.exchange(
-                cxProperties.getUrl().concat(SCAN_QUERIES),
-                HttpMethod.GET,
-                httpEntity,
-                OdScanQueries.class,
-                projectId,
-                scanId
-                );
-        OdScanQueries scanQueries = response.getBody();
-        List<ScanResults.XIssue> xIssueList = new ArrayList<>();
-        for(OdScanQueryItem item : scanQueries.getData().getItems()) {
-            for(OdScanQueryCategory vulnerability : item.getCategories()) {
-                getScanResults(buId,
-                                appId,
-                                projectId,
-                                scanId,
-                                item.getLanguage(),
-                                vulnerability,
-                                scanSummary,
-                                xIssueList,
-                                filter);
+    private void handleSastIssue(List<ScanResults.XIssue> xIssues, SASTScanResult sastResult,
+                                Map<String, OdScanResultItem> scanResultItems,
+                                int projectId, int scanId, Map<String, Integer> policyCount){
+        boolean newIssue = true;
+        OdScanResultItem x = scanResultItems.get(sastResult.getId().toString());
+        sastResult.setVulnerabilityType(x.getTitle());
+        ScanResults.XIssue xIssue = ScanResults.XIssue.builder()
+                .vulnerability(sastResult.getVulnerabilityType())
+                .file(sastResult.getSourceNode().getFilePath())
+                .description(sastResult.getDescription())
+                .cwe(sastResult.getCwe())
+                .language(sastResult.getLanguageName())
+                .severity(sastResult.getSeverity().getSeverity())
+                .similarityId(sastResult.getSimilarityId().toString())
+                .build();
+
+        if(xIssues.contains(xIssue)){
+            ScanResults.XIssue tmp = xIssues.get(xIssues.indexOf(xIssue));
+            if(tmp != null){
+                newIssue = false;
+                xIssue = tmp;
             }
         }
-        scanResults.scanSummary(scanSummary);
-        scanResults.xIssues(xIssueList);
-        Map<String, Object> additionalDetails = new HashMap();
-        Map<String, Integer> scanDetails = new HashMap();
-        scanDetails.put("high", scanSummary.getHighSeverity());
-        scanDetails.put("medium", scanSummary.getMediumSeverity());
-        scanDetails.put("low", scanSummary.getLowSeverity());
-        additionalDetails.put("flow-summary", scanDetails);
-        scanResults.additionalDetails(additionalDetails);
-    }
+        else {
+            Integer count = policyCount.get(sastResult.getSeverity().getSeverity());
+            if(count == null){
+                policyCount.put(sastResult.getSeverity().getSeverity(), 1);
+            }
+            else {
+                count ++;
+                policyCount.put(sastResult.getSeverity().getSeverity(), count);
+            }
+            xIssue.setDetails(new HashMap<>());
+        }
 
+        Map<String, Object> result = new HashMap<>();
+        result.put("source",getNodeData(sastResult.getSourceNode()));
+        result.put("sink",getNodeData(sastResult.getSinkNode()));
+        result.put("state", sastResult.getState());
 
-    public com.checkmarx.sdk.dto.od.ScanResults getScanResults(Integer scanId) throws CheckmarxException {
-        HttpEntity httpEntity = new HttpEntity<>(authClient.createAuthHeaders());
-        try {
-            log.info("Retrieving Scan Results for Scan Id {} ", scanId);
-            //ResponseEntity<com.checkmarx.sdk.dto.od.ScanResults> response = restTemplate.exchange(
-            ResponseEntity<String> response = restTemplate.exchange(
-                    cxProperties.getUrl().concat(SCAN_RESULTS),
-                    HttpMethod.GET,
-                    httpEntity,
-                    //com.checkmarx.sdk.dto.od.ScanResults.class,
-                    String.class,
-                    scanId);
-            return null;
-            //return response.getBody();
-        } catch(HttpStatusCodeException e) {
-            log.error("Error occurred while retrieving the scan results for id {}.", scanId);
-            log.error(ExceptionUtils.getStackTrace(e));
-            throw new CheckmarxException("Error occurred while retrieving the scan status for id ".concat(Integer.toString(scanId)));
+        List<Map<String, Object>> resultList = (List<Map<String, Object>>) xIssue.getAdditionalDetails().get(ADDITIONAL_DETAILS_KEY);
+        if(resultList == null){  //new list
+            resultList = new ArrayList<>();
+        }
+        resultList.add(result);
+
+        int loc = sastResult.getSourceNode().getLine();
+        String snippet = extractCodeSnippet(projectId, scanId, loc, sastResult.getSourceNode().getFilePath());
+
+        ScanResults.IssueDetails details = new ScanResults.IssueDetails();
+        details.setCodeSnippet(snippet);
+        if(sastResult.getState().equals(STATE_MAP.get("NOT_EXPLOITABLE"))){
+            details.setFalsePositive(true);
+        }
+        xIssue.getDetails().put(loc, details);
+        xIssue.getAdditionalDetails().put(ADDITIONAL_DETAILS_KEY, resultList);
+        if(newIssue){ //only if the issue is new, add, otherwise references were updated
+            xIssues.add(xIssue);
         }
     }
 
-    private void getScanResults(Integer buId,
-                                    Integer appId,
-                                    Integer projectId,
-                                    Integer scanId,
-                                    String language,
-                                    OdScanQueryCategory vulnerability,
-                                    CxScanSummary scanSummary,
-                                    List<ScanResults.XIssue> xIssueList,
-                                    FilterConfiguration filter) {
+    private void handleScaIssue(List<ScanResults.XIssue> xIssues, List<Finding> findings, List<Package> packages, SCAScanResult scaResult) {
+        Finding finding = new Finding();
+        Package pkg = new Package();
+        pkg.setId(scaResult.getPackageId());
+        pkg.setVersion(scaResult.getFixResolutionText());
+        pkg.setName(scaResult.getPackageId());
+        finding.setCveName(scaResult.getCveName());
+        finding.setDescription(scaResult.getDescription());
+        finding.setId(scaResult.getId());
+        finding.setIgnored(scaResult.isIgnored());
+        finding.setPackageId(scaResult.getPackageId());
+        finding.setFixResolutionText(scaResult.getFixResolutionText());
+        finding.setPublishDate(scaResult.getPublishedAt());
+        finding.setScore(scaResult.getScore());
+        finding.setSimilarityId(scaResult.getSimilarityId());
+        finding.setSeverity(Severity.valueOf(scaResult.getSeverity().getSeverity().toUpperCase()));
+        finding.setSeverity(Severity.valueOf(scaResult.getSeverity().getSeverity().toUpperCase()));
 
-        OdScanResults scanResults = getScanResultsPage(projectId, scanId, vulnerability);
-        for(OdScanResultItem item : scanResults.getData().getItems()) {
-            if(filterValidator.passesFilter(vulnerability, item, filter)) {
-                String deepLink = cxProperties.getPortalUrl().concat("/scan/business-unit/%s/application/%s/project/%s/scans/%s");
-                deepLink = String.format(deepLink, buId, appId, projectId, scanId);
-                ScanResults.XIssue.XIssueBuilder xib = ScanResults.XIssue.builder();
-                xib.similarityId(item.getSimilarityId());
-                xib.file(item.getSourceFile());
-                xib.link(deepLink);
-                xib.language(language);
-                xib.severity(vulnerability.getSeverity());
-                xib.vulnerability(vulnerability.getTitle());
-                String comment = item.getHasNotes() ? item.getNotes() : "";
-                boolean falsePositive = (item.getState() == 2) ? true : false;
-                Map<Integer, ScanResults.IssueDetails> issueDetailsList = new HashMap<>();
-                Map<Integer, ScanResults.IssueDetails> detail = getScanResultDetails(projectId,
-                                                                                        scanId,
-                                                                                        item.getId(),
-                                                                                        comment,
-                                                                                        falsePositive);
-                Integer []keys = new Integer[1];
-                detail.keySet().toArray(keys);
-                Integer loc = keys[0];
-                ScanResults.IssueDetails issueDetail = detail.get(loc);
-                issueDetailsList.put(loc, issueDetail);
-                xib.details(issueDetailsList);
-                ScanResults.XIssue issue = xib.build();
-                if(!xIssueList.contains(issue)) {
-                    updateIssueSummary(scanSummary, item);
-                    xIssueList.add(issue);
-                } else {
-                    ScanResults.XIssue existingIssue = xIssueList.get(xIssueList.indexOf(issue));
-                    existingIssue.getDetails().put(loc, issueDetail);
+        if(findings.stream().noneMatch(f->{
+            return f.getPackageId().equalsIgnoreCase(finding.getPackageId());
+        })){
+            findings.add(finding);
+            packages.add(pkg);
+            List<ScanResults.ScaDetails> scaDetails = new ArrayList<>();
+            ScanResults.ScaDetails scaDetail = ScanResults.ScaDetails.builder()
+                    .finding(finding)
+                    .vulnerabilityLink("N/A")
+                    .vulnerabilityPackage(pkg)
+                    .build();
+            scaDetails.add(scaDetail);
+            xIssues.add(ScanResults.XIssue.builder()
+                    .similarityId(finding.getSimilarityId())
+                    .severity(finding.getSeverity().toString())
+                    .description(finding.getDescription())
+                    .scaDetails(scaDetails)
+                    .build());
+        }
+    }
+
+
+    private Map<String, String> getNodeData(ResultNode node) {
+        // Node data: file/line/object
+        Map<String, String> nodeData = new HashMap<>();
+        nodeData.put("file", node.getFileName());
+        nodeData.put("line", node.getLine().toString());
+        nodeData.put("column", node.getColumn().toString());
+        nodeData.put("object", node.getName());
+        return nodeData;
+    }
+
+    private boolean filterIssue(SASTScanResult result, FilterConfiguration filter){
+        List<Filter>  filters = filter.getSimpleFilters();
+        if(filters == null || filters.isEmpty()){
+            return true;
+        }
+        for(Filter f : filters){
+            if (f.getType() == Filter.Type.SEVERITY) {
+                if (!result.getSeverity().getSeverity().equalsIgnoreCase(f.getValue())) {
+                    return false;
                 }
             }
+            else if (f.getType() == Filter.Type.STATE) {
+                if(!result.getState().equals(STATE_MAP.get(f.getValue().toUpperCase()))) {
+                    return false;
+                }
+            }
+            //TODO Category/CWE/Status
         }
+        //if you passed through all filters, you made it!
+        return true;
     }
 
-    private OdScanResults getScanResultsPage(Integer projectId, Integer scanId, OdScanQueryCategory vulnerability) {
-        HttpEntity httpEntity = new HttpEntity<>(authClient.createAuthHeaders());
-        OdScanResults appList = new OdScanResults();
-        boolean morePages = true;
-        int curPage = 0;
-        int pageSize = 50;
-        long totalCount = 0;
-        long rcvItemCnt = 0;
-        while(morePages) {
-            // Fetch the current page
-            ResponseEntity<OdScanResults> response = restTemplate.exchange(
-                    cxProperties.getUrl().concat(SCAN_RESULTS_ENCODED),
-                    HttpMethod.GET,
-                    httpEntity,
-                    OdScanResults.class,
-                    projectId,
-                    scanId,
-                    vulnerability.getId(),
-                    curPage,
-                    pageSize
-            );
-            // Are there more results
-            OdScanResults curList = response.getBody();
-            if(curPage == 0) totalCount = curList.getData().getTotalCount();
-            rcvItemCnt += curList.getData().getItems().size();
-            // There are more items, add them to the list
-            if (appList.getData() == null) {
-                appList.setData(curList.getData());
-            } else {
-                appList.getData().getItems().addAll(curList.getData().getItems());
-            }
-            if(rcvItemCnt < totalCount) {
-                curPage++;
-            } else {
-                morePages = false;
-            }
+    private boolean filterIssue(SCAScanResult result, FilterConfiguration filter){
+        List<Filter>  filters = filter.getSimpleFilters();
+        if(filters == null || filters.isEmpty() || result.isIgnored()){
+            return true;
         }
-        return appList;
-    }
-
-    private Map<Integer, ScanResults.IssueDetails> getScanResultDetails(Integer projectId,
-                                                          Integer scanId,
-                                                          Integer resultId,
-                                                          String comment,
-                                                          boolean falsePositive) {
-        HttpEntity httpEntity = new HttpEntity<>(null, authClient.createAuthHeaders());
-        ResponseEntity<OdScanNodes> response = restTemplate.exchange(
-                cxProperties.getUrl().concat(SCAN_RESULT_NODES_ENCODED),
-                HttpMethod.GET,
-                httpEntity,
-                OdScanNodes.class,
-                projectId,
-                scanId,
-                resultId
-        );
-        OdScanNodes scanNodes = response.getBody();
-        ScanResults.IssueDetails issueDetails = null;
-        Map<Integer, ScanResults.IssueDetails> detail = new HashMap<>();
-        if(scanNodes.getData().getItems().size() > 0) {
-            OdScanNodeItem item = scanNodes.getData().getItems().get(0);
-            String snippet = extractCodeSnippet(projectId, scanId, item.getLine(), item.getFile().getId());
-            issueDetails = new ScanResults.IssueDetails()
-                    .codeSnippet(snippet)
-                    .comment(comment)
-                    .falsePositive(falsePositive);
-            detail.put(item.getLine(), issueDetails);
+        for(Filter f : filters){
+            if (f.getType() == Filter.Type.SEVERITY) {
+                if (!result.getSeverity().getSeverity().equalsIgnoreCase(f.getValue())) {
+                    return false;
+                }
+            }
+            //TODO Category/CWE/Status
         }
-        return detail;
+        //if you passed through all filters, you made it!
+        return true;
     }
 
     private void updateIssueSummary(CxScanSummary scanSummary, OdScanResultItem vulnerability) {
@@ -566,7 +625,7 @@ public class CxService implements CxClient{
         if(codeCache.containsKey(filePath)) {
             sourceCode = (String)codeCache.get(filePath);
         } else {
-            HttpEntity httpEntity = new HttpEntity<>(null, authClient.createAuthHeaders());
+            HttpEntity<?> httpEntity = new HttpEntity<>(null, authClient.createAuthHeaders());
             ResponseEntity<OdScanFileResult> response = restTemplate.exchange(
                     cxProperties.getUrl().concat(SCAN_FILE),
                     HttpMethod.GET,
@@ -577,6 +636,7 @@ public class CxService implements CxClient{
                     filePath
             );
             OdScanFileResult sfr = response.getBody();
+            assert sfr != null;
             sourceCode = sfr.getData().getCode();
             codeCache.put(filePath, sourceCode);
         }
@@ -603,7 +663,7 @@ public class CxService implements CxClient{
 
     @Override
     public Integer getProjectId(String ownerId, String name) {
-        log.info("Retrieving OD Project List");
+        log.debug("Retrieving OD Project List");
         OdProjectList appList = getProjectPage(ownerId);
         for(OdProjectListDataItem item : appList.getData().getItems()) {
             if(item.getName().equals(name)) {
@@ -729,7 +789,7 @@ public class CxService implements CxClient{
         CxProject.CxProjectBuilder builder = CxProject.builder();
         builder.id(projectId);
         builder.isPublic(true);
-        builder.name("CXOD Temporary Project");
+        builder.name("CxGo Temporary Project");
         builder.teamId(null);
         builder.links(null);
         builder.customFields(customFields);
@@ -800,8 +860,6 @@ public class CxService implements CxClient{
         return null;
     }
 
-
-
     //
     /// I think things below here should be removed the public interface. They are specific
     /// Cx SAST.
@@ -816,9 +874,9 @@ public class CxService implements CxClient{
     }
 
     public ScanStatus getScanStatusById(Integer scanId) throws CheckmarxException {
-        HttpEntity httpEntity = new HttpEntity<>(authClient.createAuthHeaders());
+        HttpEntity<?> httpEntity = new HttpEntity<>(authClient.createAuthHeaders());
         try {
-            log.info("Retrieving OD Navigation Tree");
+            log.debug("Retrieving ScanStatus for Scan Id {}", scanId);
             ResponseEntity<ScanStatus> response = restTemplate.exchange(
                     cxProperties.getUrl().concat(SCAN_STATUS),
                     HttpMethod.GET,
@@ -852,7 +910,7 @@ public class CxService implements CxClient{
     }
 
     public List<Scan> getScans() throws CheckmarxException {
-        HttpEntity httpEntity = new HttpEntity<>(authClient.createAuthHeaders());
+        HttpEntity<?> httpEntity = new HttpEntity<>(authClient.createAuthHeaders());
         try {
             log.debug("Retrieving all scans");
             ResponseEntity<Scan[]> response = restTemplate.exchange(
@@ -866,6 +924,73 @@ public class CxService implements CxClient{
             log.error(ExceptionUtils.getStackTrace(e));
             throw new CheckmarxException("Error occurred while retrieving scans");
         }
+    }
+
+    private com.checkmarx.sdk.dto.od.ScanResults getScanResults(Integer scanId) throws CheckmarxException {
+        HttpEntity<?> httpEntity = new HttpEntity<>(authClient.createAuthHeaders());
+
+        try {
+            log.info("Retrieving Scan Results for Scan Id {} ", scanId);
+            ResponseEntity<com.checkmarx.sdk.dto.od.ScanResults> response = restTemplate.exchange(
+                    //ResponseEntity<String> response = restTemplate.exchange(
+                    cxProperties.getUrl().concat(SCAN_RESULTS),
+                    HttpMethod.GET,
+                    httpEntity,
+                    com.checkmarx.sdk.dto.od.ScanResults.class,
+                    //String.class,
+                    scanId);
+            //return null;
+            return response.getBody();
+        } catch(HttpStatusCodeException e) {
+            log.error("Error occurred while retrieving the scan results for id {}.", scanId);
+            log.error(ExceptionUtils.getStackTrace(e));
+            throw new CheckmarxException("Error occurred while retrieving the scan status for id ".concat(Integer.toString(scanId)));
+        }
+    }
+
+    private Map<String, OdScanResultItem> getScanResultsPage(Integer projectId, Integer scanId) {
+        HttpEntity<?> httpEntity = new HttpEntity<>(authClient.createAuthHeaders());
+        OdScanResults appList = new OdScanResults();
+        boolean morePages = true;
+        int curPage = 0;
+        int pageSize = 50;
+        long totalCount = 0;
+        long rcvItemCnt = 0;
+        while(morePages) {
+            // Fetch the current page
+            ResponseEntity<OdScanResults> response = restTemplate.exchange(
+                    cxProperties.getUrl().concat(SCAN_RESULTS_ENCODED),
+                    HttpMethod.GET,
+                    httpEntity,
+                    OdScanResults.class,
+                    projectId,
+                    scanId,
+                    curPage,
+                    pageSize
+            );
+            // Are there more results
+            OdScanResults curList = response.getBody();
+            if(curPage == 0) totalCount = curList.getData().getTotalCount();
+            rcvItemCnt += curList.getData().getItems().size();
+            // There are more items, add them to the list
+            if (appList.getData() == null) {
+                appList.setData(curList.getData());
+            } else {
+                appList.getData().getItems().addAll(curList.getData().getItems());
+            }
+            if(rcvItemCnt < totalCount) {
+                curPage++;
+            } else {
+                morePages = false;
+            }
+        }
+        //create a map lookup based on the id
+        return appList.getData()
+                        .getItems()
+                        .stream()
+                        .collect(Collectors.toMap(
+                                i -> i.getId().toString(), i -> i, (a, b) -> b)
+                        );
     }
 
     @Override
