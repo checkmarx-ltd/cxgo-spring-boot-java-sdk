@@ -410,7 +410,7 @@ public class CxService implements CxClient{
 
             scaResults.setFindings(findings);
             scaResults.setPackages(packages);
-            if(scanResults.getSca() != null || !scanResults.getSca().isEmpty()) {
+            if (!scanResults.getSca().isEmpty()) {
                 scaResults.setScanId(scanResults.getSca().get(0).getScanId().toString());
             }
             Map<String, Object> sca = (Map<String, Object>) scan.getEngines().get("sca");
