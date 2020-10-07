@@ -10,6 +10,7 @@ import com.checkmarx.sdk.dto.cx.*;
 import com.checkmarx.sdk.dto.filtering.FilterConfiguration;
 import com.checkmarx.sdk.dto.od.*;
 import com.checkmarx.sdk.exception.CheckmarxException;
+import com.checkmarx.sdk.exception.CheckmarxRuntimeException;
 import com.cx.restclient.ast.dto.sca.report.Finding;
 import com.cx.restclient.ast.dto.sca.report.Package;
 import com.cx.restclient.dto.scansummary.Severity;
@@ -81,7 +82,7 @@ public class CxService implements CxClient{
     /// results we are starting with project information and trying to find the last
     /// scanID.
     //
-    private static Map<String, CxScanParams> scanIdMap = new HashMap();
+    private static Map<String, CxScanParams> scanIdMap = new HashMap<>();
     //
     /// This was used for /scanresults API calls to avoid modifying CxFlow. This
     /// captures information at key points as CxService API calls are made so
@@ -358,18 +359,8 @@ public class CxService implements CxClient{
         Integer buId = scan.getBusinessUnitId();
         Integer appId = scan.getApplicationId();
 
-        //CompletableFuture<Map<String, OdScanResultItem>> scanResultItemsFuture = resultService.getScanResultsPage(projectId, scanId);
-        //CompletableFuture<com.checkmarx.sdk.dto.od.ScanResults> scanResultsFuture = resultService.getScanResults(scanId);
         Map<String, OdScanResultItem> scanResultItems = getScanResultsPage(projectId, scanId);
         com.checkmarx.sdk.dto.od.ScanResults scanResults = getScanResults(scanId);
-        /*CompletableFuture.allOf(scanResultItemsFuture, scanResultsFuture);
-        if(scanResultItemsFuture.isCompletedExceptionally() || scanResultsFuture.isCompletedExceptionally()){
-            throw new CheckmarxException("Error retrieving results for Scan ".concat(scanId.toString()));
-        }
-
-        com.checkmarx.sdk.dto.od.ScanResults scanResults = scanResultsFuture.join();
-        Map<String, OdScanResultItem> scanResultItems = scanResultItemsFuture.join();
-        */
 
         List<ScanResults.XIssue> xIssues = new ArrayList<>();
         //SAST
@@ -392,6 +383,7 @@ public class CxService implements CxClient{
             }
             Map<String, Object> flowSummary = new HashMap<>();
             flowSummary.put(Constants.SUMMARY_KEY, policyCount);
+            flowSummary.put(Constants.SCAN_ID_KEY, scanId);
             results.additionalDetails(flowSummary);
             results.scanSummary(scanSummary);
         }
@@ -676,7 +668,7 @@ public class CxService implements CxClient{
     }
 
     private OdProjectList getProjectPage(String ownerId) {
-        HttpEntity httpEntity = new HttpEntity<>(authClient.createAuthHeaders());
+        HttpEntity<Void> httpEntity = new HttpEntity<>(authClient.createAuthHeaders());
         OdProjectList appList = new OdProjectList();
         boolean morePages = true;
         int curPage = 0;
@@ -740,7 +732,7 @@ public class CxService implements CxClient{
     }
 
     private OdScanList getScanStatusPage(Integer projectId) {
-        HttpEntity httpEntity = new HttpEntity<>(authClient.createAuthHeaders());
+        HttpEntity<Void> httpEntity = new HttpEntity<>(authClient.createAuthHeaders());
         OdScanList appList = new OdScanList();
         boolean morePages = true;
         int curPage = 0;
@@ -891,8 +883,8 @@ public class CxService implements CxClient{
         }
     }
 
-    public Scan getScanDetails(Integer scanId) throws CheckmarxException {
-        HttpEntity httpEntity = new HttpEntity<>(authClient.createAuthHeaders());
+    private Scan getScanDetails(Integer scanId) throws CheckmarxException {
+        HttpEntity<Void> httpEntity = new HttpEntity<>(authClient.createAuthHeaders());
         try {
             log.debug("Retrieving scan with id {}", scanId);
             ResponseEntity<Scan> response = restTemplate.exchange(
@@ -901,7 +893,9 @@ public class CxService implements CxClient{
                     httpEntity,
                     Scan.class,
                     scanId);
-            return response.getBody();
+
+            return Optional.ofNullable(response.getBody())
+                    .orElseThrow(() -> new CheckmarxRuntimeException("Scan details response body is missing."));
         } catch(HttpStatusCodeException e) {
             log.error("Error occurred while retrieving the scan with id {}", scanId);
             log.error(ExceptionUtils.getStackTrace(e));
