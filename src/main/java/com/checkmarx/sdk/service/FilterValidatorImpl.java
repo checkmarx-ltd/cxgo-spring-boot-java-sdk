@@ -2,12 +2,9 @@ package com.checkmarx.sdk.service;
 
 import com.checkmarx.sdk.dto.Filter;
 import com.checkmarx.sdk.dto.filtering.FilterConfiguration;
-import com.checkmarx.sdk.dto.filtering.ScriptInput;
+import com.checkmarx.sdk.dto.filtering.FilterInput;
 import com.checkmarx.sdk.dto.filtering.ScriptedFilter;
-import com.checkmarx.sdk.dto.od.OdScanQueryCategory;
-import com.checkmarx.sdk.dto.od.OdScanResultItem;
 import com.checkmarx.sdk.exception.CheckmarxRuntimeException;
-import com.google.common.collect.ImmutableMap;
 import groovy.lang.Binding;
 import groovy.lang.GroovyRuntimeException;
 import groovy.lang.Script;
@@ -17,31 +14,22 @@ import org.springframework.stereotype.Service;
 
 import javax.validation.constraints.NotNull;
 import java.lang.reflect.Field;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 @Service
 @Slf4j
 public class FilterValidatorImpl implements FilterValidator {
     /**
-     * Maps finding state name (as specified in filter) to a numeric state ID (as returned in SAST report).
-     */
-    private static final Map<String, String> STATE_MAP = ImmutableMap.of(
-            "TO VERIFY", "0",
-            "CONFIRMED", "2",
-            "URGENT", "3",
-            "PROPOSED NOT EXPLOITABLE", "4"
-    );
-    private static final Map<String, String> STATE_ID_TO_NAME = getInvertedStateMap();
-
-    /**
      * An object variable with this name will be passed to the filtering script.
      */
     private static final String INPUT_VARIABLE_NAME = "finding";
 
     @Override
-    public boolean passesFilter(@NotNull OdScanQueryCategory findingGroup, @NotNull OdScanResultItem finding,
-                                FilterConfiguration filterConfiguration) {
+    public boolean passesFilter(@NotNull FilterInput finding, FilterConfiguration filterConfiguration) {
         boolean result;
 
         boolean hasSimpleFilters = hasSimpleFilters(filterConfiguration);
@@ -54,29 +42,23 @@ public class FilterValidatorImpl implements FilterValidator {
             // No filters => everything passes.
             result = true;
         } else if (hasScriptedFilter) {
-            result = passesScriptedFilter(findingGroup, finding, filterConfiguration);
+            result = passesScriptedFilter(finding, filterConfiguration);
         } else {
-            result = passesSimpleFilter(findingGroup, finding, filterConfiguration);
+            result = passesSimpleFilter(finding, filterConfiguration);
         }
         log.debug("Finding {} {} the filter.", finding.getId(), result ? "passes" : "does not pass");
 
         return result;
     }
 
-    private static boolean passesScriptedFilter(OdScanQueryCategory findingGroup,
-                                                OdScanResultItem finding,
-                                                FilterConfiguration filterConfiguration) {
+    private static boolean passesScriptedFilter(FilterInput finding, FilterConfiguration filterConfiguration) {
         ScriptedFilter filter = filterConfiguration.getScriptedFilter();
-        ScriptInput input = getScriptInput(findingGroup, finding);
-        return evaluateFilterScript(filter.getScript(), input);
+        return evaluateFilterScript(filter.getScript(), finding);
     }
 
-    private static boolean passesSimpleFilter(OdScanQueryCategory findingGroup,
-                                              OdScanResultItem finding,
-                                              FilterConfiguration filterConfiguration) {
+    private static boolean passesSimpleFilter(FilterInput finding, FilterConfiguration filterConfiguration) {
         List<Filter> filters = filterConfiguration.getSimpleFilters();
-        return CollectionUtils.isEmpty(filters) ||
-                (findingGroupPassesFilter(findingGroup, filters) && findingPassesFilter(finding, filters));
+        return CollectionUtils.isEmpty(filters) || findingPassesFilter(finding, filters);
     }
 
     private static boolean hasScriptedFilter(FilterConfiguration filterConfiguration) {
@@ -90,69 +72,44 @@ public class FilterValidatorImpl implements FilterValidator {
                 CollectionUtils.isNotEmpty(filterConfiguration.getSimpleFilters());
     }
 
-    private static boolean findingGroupPassesFilter(OdScanQueryCategory findingGroup, List<Filter> filters) {
+    private static boolean findingPassesFilter(FilterInput finding, List<Filter> filters) {
+        List<String> statuses = new ArrayList<>();
+        List<String> states = new ArrayList<>();
         List<String> severity = new ArrayList<>();
         List<String> cwe = new ArrayList<>();
         List<String> category = new ArrayList<>();
+
         for (Filter filter : filters) {
+            List<String> targetList = null;
             Filter.Type type = filter.getType();
             String value = filter.getValue();
-            List<String> targetList = null;
-            if (type.equals(Filter.Type.SEVERITY)) {
+            if (type.equals(Filter.Type.STATUS)) {
+                targetList = statuses;
+            } else if (type.equals(Filter.Type.STATE)) {
+                targetList = states;
+            } else if (type.equals(Filter.Type.SEVERITY)) {
                 targetList = severity;
             } else if (type.equals(Filter.Type.TYPE)) {
                 targetList = category;
             } else if (type.equals(Filter.Type.CWE)) {
                 targetList = cwe;
             }
+
             if (targetList != null) {
                 targetList.add(value.toUpperCase(Locale.ROOT));
             }
         }
-        return fieldMatches(findingGroup.getSeverity(), severity) &&
-                // TODO: update this when CWE info is available
-                // CxOD currently does not have CWE info
-                //fieldMatches(findingGroup.getCweId(), cwe) &&
-                fieldMatches(findingGroup.getTitle(), category);
-    }
 
-    private static boolean findingPassesFilter(OdScanResultItem finding, List<Filter> filters) {
-        List<String> statuses = new ArrayList<>();
-        List<String> states = new ArrayList<>();
-        for (Filter filter : filters) {
-            if (filter.getType().equals(Filter.Type.STATUS)) {
-                statuses.add(filter.getValue().toUpperCase(Locale.ROOT));
-            } else if (filter.getType().equals(Filter.Type.STATE)) {
-                String stateName = filter.getValue().toUpperCase(Locale.ROOT);
-                String stateId = STATE_MAP.get(stateName);
-                if (stateId == null) {
-                    log.warn("Unknown status is specified in filter: '{}'. This filter value will be ignored.",
-                            filter.getValue());
-                } else {
-                    states.add(stateId);
-                }
-            }
-        }
         return fieldMatches(finding.getStatus(), statuses) &&
-                fieldMatches(finding.getState().toString(), states);
+                fieldMatches(finding.getState(), states) &&
+                fieldMatches(finding.getSeverity(), severity) &&
+                fieldMatches(finding.getCweId(), cwe) &&
+                fieldMatches(finding.getCategory(), category);
     }
 
-    private static ScriptInput getScriptInput(OdScanQueryCategory findingGroup, OdScanResultItem finding) {
-        String stateName = STATE_ID_TO_NAME.get(finding.getState());
-        return ScriptInput.builder()
-                .category(findingGroup.getTitle().toUpperCase(Locale.ROOT))
-                // TODO: update this when CWE info is available.
-                // CxOD currently doesn't have CWE information
-                //.cwe(findingGroup.getCweId())
-                .severity(findingGroup.getSeverity().toUpperCase(Locale.ROOT))
-                .status(finding.getStatus().toUpperCase(Locale.ROOT))
-                .state(stateName)
-                .build();
-    }
-
-    private static boolean evaluateFilterScript(Script script, ScriptInput input) {
+    private static boolean evaluateFilterScript(Script script, FilterInput finding) {
         Binding binding = new Binding();
-        binding.setVariable(INPUT_VARIABLE_NAME, input);
+        binding.setVariable(INPUT_VARIABLE_NAME, finding);
         script.setBinding(binding);
         Object rawResult = null;
         try {
@@ -171,7 +128,7 @@ public class FilterValidatorImpl implements FilterValidator {
     }
 
     private static void rethrowWithDetailedMessage(GroovyRuntimeException cause) {
-        List<String> existingFields = Arrays.stream(ScriptInput.class.getDeclaredFields())
+        List<String> existingFields = Arrays.stream(FilterInput.class.getDeclaredFields())
                 .map(Field::getName)
                 .collect(Collectors.toList());
 
@@ -186,13 +143,5 @@ public class FilterValidatorImpl implements FilterValidator {
     private static boolean fieldMatches(String fieldValue, List<String> allowedValues) {
         return allowedValues.isEmpty() ||
                 allowedValues.contains(fieldValue.toUpperCase(Locale.ROOT));
-    }
-
-    private static Map<String, String> getInvertedStateMap() {
-        Map<String, String> result = new HashMap<>();
-        for (Map.Entry<String, String> entry : FilterValidatorImpl.STATE_MAP.entrySet()) {
-            result.put(entry.getValue(), entry.getKey());
-        }
-        return ImmutableMap.copyOf(result);
     }
 }

@@ -8,6 +8,7 @@ import com.checkmarx.sdk.dto.ast.SCAResults;
 import com.checkmarx.sdk.dto.ast.Summary;
 import com.checkmarx.sdk.dto.cx.*;
 import com.checkmarx.sdk.dto.filtering.FilterConfiguration;
+import com.checkmarx.sdk.dto.filtering.FilterInput;
 import com.checkmarx.sdk.dto.od.*;
 import com.checkmarx.sdk.exception.CheckmarxException;
 import com.checkmarx.sdk.exception.CheckmarxRuntimeException;
@@ -34,6 +35,8 @@ import org.springframework.web.client.RestTemplate;
 import java.io.*;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -64,15 +67,6 @@ public class CxService implements CxClient{
     private static final String SCA_DEEP_LINK = "/scan/business-unit/%s/application/%s/project/%s";
     private static final String ADDITIONAL_DETAILS_KEY = "results";
 
-    private final Map<String, Integer> STATE_MAP = Collections.unmodifiableMap(new HashMap<String, Integer>() {
-        {
-            put("TO_VERIFY", 1);
-            put("NOT_EXPLOITABLE", 2);
-            put("CONFIRMED", 3);
-            put("URGENT", 4);
-        }
-    });
-    //
     /// CxOD required extra information for API calls not used by the SAST SDK. This
     /// data structure is used to capture that information as CxService calls are made
     /// during scan requests. This information is tracked using the current CxOD scan ID
@@ -93,14 +87,17 @@ public class CxService implements CxClient{
     private final CxProperties cxProperties;
     private final CxAuthClient authClient;
     private final RestTemplate restTemplate;
-    private Map<String, Object> codeCache = new HashMap<>();
+    private final Map<String, Object> codeCache = new HashMap<>();
     private CxRepoFileService cxRepoFileService;
+    private final FilterValidator filterValidator;
 
     public CxService(CxProperties cxProperties, CxAuthClient authClient,
-                     @Qualifier("cxRestTemplate") RestTemplate restTemplate) {
+                     @Qualifier("cxRestTemplate") RestTemplate restTemplate,
+                     FilterValidator filterValidator) {
         this.cxProperties = cxProperties;
         this.authClient = authClient;
         this.restTemplate = restTemplate;
+        this.filterValidator = filterValidator;
     }
 
     private String createApplication(String appName, String appDesc, String baBuId) {
@@ -368,8 +365,8 @@ public class CxService implements CxClient{
             Map<String, Integer> policyCount = new HashMap<>();
             log.info("Processing SAST results");
             scanResults.getSast().stream()
-                  .filter( i -> filterIssue(i, filter))
-                  .forEach( i -> handleSastIssue(xIssues, i, scanResultItems, projectId, scanId, policyCount));
+                    .filter(onlyResultsThatMatchFilter(scanResultItems, filter))
+                    .forEach(i -> handleSastIssue(xIssues, i, scanResultItems, projectId, scanId, policyCount));
             CxScanSummary scanSummary = new CxScanSummary();
             Map<String, Object> sast = (Map<String, Object>) scan.getEngines().get("sast");
             if(sast != null){
@@ -434,6 +431,16 @@ public class CxService implements CxClient{
         return results.build();
     }
 
+    private Predicate<SASTScanResult> onlyResultsThatMatchFilter(Map<String, OdScanResultItem> scanResultItems,
+                                                                 FilterConfiguration filter) {
+        return sastScanResult -> {
+            String resultId = sastScanResult.getId().toString();
+            OdScanResultItem odScanResultItem = scanResultItems.get(resultId);
+            FilterInput filterInput = FilterInput.getInstance(sastScanResult, odScanResultItem);
+            return filterValidator.passesFilter(filterInput, filter);
+        };
+    }
+
     private void handleSastIssue(List<ScanResults.XIssue> xIssues, SASTScanResult sastResult,
                                 Map<String, OdScanResultItem> scanResultItems,
                                 int projectId, int scanId, Map<String, Integer> policyCount){
@@ -485,7 +492,7 @@ public class CxService implements CxClient{
 
         ScanResults.IssueDetails details = new ScanResults.IssueDetails();
         details.setCodeSnippet(snippet);
-        if(sastResult.getState().equals(STATE_MAP.get("NOT_EXPLOITABLE"))){
+        if(sastResult.getState().equals(SASTScanResult.State.NOT_EXPLOITABLE.getValue())) {
             details.setFalsePositive(true);
         }
         xIssue.getDetails().put(loc, details);
@@ -543,28 +550,6 @@ public class CxService implements CxClient{
         nodeData.put("column", node.getColumn().toString());
         nodeData.put("object", node.getName());
         return nodeData;
-    }
-
-    private boolean filterIssue(SASTScanResult result, FilterConfiguration filter){
-        List<Filter>  filters = filter.getSimpleFilters();
-        if(filters == null || filters.isEmpty()){
-            return true;
-        }
-        for(Filter f : filters){
-            if (f.getType() == Filter.Type.SEVERITY) {
-                if (!result.getSeverity().getSeverity().equalsIgnoreCase(f.getValue())) {
-                    return false;
-                }
-            }
-            else if (f.getType() == Filter.Type.STATE) {
-                if(!result.getState().equals(STATE_MAP.get(f.getValue().toUpperCase()))) {
-                    return false;
-                }
-            }
-            //TODO Category/CWE/Status
-        }
-        //if you passed through all filters, you made it!
-        return true;
     }
 
     private boolean filterIssue(SCAScanResult result, FilterConfiguration filter){
@@ -983,7 +968,9 @@ public class CxService implements CxClient{
                         .getItems()
                         .stream()
                         .collect(Collectors.toMap(
-                                i -> i.getId().toString(), i -> i, (a, b) -> b)
+                                odScanResultItem -> odScanResultItem.getId().toString(),
+                                Function.identity(),
+                                (thisItem, nextItem) -> nextItem)
                         );
     }
 
