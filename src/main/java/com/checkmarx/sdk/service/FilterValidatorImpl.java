@@ -3,13 +3,13 @@ package com.checkmarx.sdk.service;
 import com.checkmarx.sdk.dto.Filter;
 import com.checkmarx.sdk.dto.filtering.FilterConfiguration;
 import com.checkmarx.sdk.dto.filtering.FilterInput;
-import com.checkmarx.sdk.dto.filtering.ScriptedFilter;
 import com.checkmarx.sdk.exception.CheckmarxRuntimeException;
 import groovy.lang.Binding;
 import groovy.lang.GroovyRuntimeException;
 import groovy.lang.Script;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang.StringUtils;
 import org.springframework.stereotype.Service;
 
 import javax.validation.constraints.NotNull;
@@ -18,6 +18,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -46,68 +48,13 @@ public class FilterValidatorImpl implements FilterValidator {
         } else {
             result = passesSimpleFilter(finding, filterConfiguration);
         }
-        log.debug("Finding {} {} the filter.", finding.getId(), result ? "passes" : "does not pass");
 
+        logFilteringResult(finding, result);
         return result;
     }
 
     private static boolean passesScriptedFilter(FilterInput finding, FilterConfiguration filterConfiguration) {
-        ScriptedFilter filter = filterConfiguration.getScriptedFilter();
-        return evaluateFilterScript(filter.getScript(), finding);
-    }
-
-    private static boolean passesSimpleFilter(FilterInput finding, FilterConfiguration filterConfiguration) {
-        List<Filter> filters = filterConfiguration.getSimpleFilters();
-        return CollectionUtils.isEmpty(filters) || findingPassesFilter(finding, filters);
-    }
-
-    private static boolean hasScriptedFilter(FilterConfiguration filterConfiguration) {
-        return filterConfiguration != null &&
-                filterConfiguration.getScriptedFilter() != null &&
-                filterConfiguration.getScriptedFilter().getScript() != null;
-    }
-
-    private static boolean hasSimpleFilters(FilterConfiguration filterConfiguration) {
-        return filterConfiguration != null &&
-                CollectionUtils.isNotEmpty(filterConfiguration.getSimpleFilters());
-    }
-
-    private static boolean findingPassesFilter(FilterInput finding, List<Filter> filters) {
-        List<String> statuses = new ArrayList<>();
-        List<String> states = new ArrayList<>();
-        List<String> severity = new ArrayList<>();
-        List<String> cwe = new ArrayList<>();
-        List<String> category = new ArrayList<>();
-
-        for (Filter filter : filters) {
-            List<String> targetList = null;
-            Filter.Type type = filter.getType();
-            String value = filter.getValue();
-            if (type.equals(Filter.Type.STATUS)) {
-                targetList = statuses;
-            } else if (type.equals(Filter.Type.STATE)) {
-                targetList = states;
-            } else if (type.equals(Filter.Type.SEVERITY)) {
-                targetList = severity;
-            } else if (type.equals(Filter.Type.TYPE)) {
-                targetList = category;
-            } else if (type.equals(Filter.Type.CWE)) {
-                targetList = cwe;
-            }
-
-            if (targetList != null) {
-                targetList.add(value.toUpperCase(Locale.ROOT));
-            }
-        }
-
-        return fieldMatches(finding.getStatus(), statuses) &&
-                fieldMatches(finding.getState(), states) &&
-                fieldMatches(finding.getSeverity(), severity) &&
-                fieldMatches(finding.getCweId(), cwe) &&
-                fieldMatches(finding.getCategory(), category);
-    }
-
-    private static boolean evaluateFilterScript(Script script, FilterInput finding) {
+        Script script = filterConfiguration.getScriptedFilter().getScript();
         Binding binding = new Binding();
         binding.setVariable(INPUT_VARIABLE_NAME, finding);
         script.setBinding(binding);
@@ -127,6 +74,47 @@ public class FilterValidatorImpl implements FilterValidator {
         }
     }
 
+    private static boolean passesSimpleFilter(FilterInput finding, FilterConfiguration filterConfiguration) {
+        List<Filter> filters = filterConfiguration.getSimpleFilters();
+        return CollectionUtils.isEmpty(filters) || findingPassesFilter(finding, filters);
+    }
+
+    private static boolean hasScriptedFilter(FilterConfiguration filterConfiguration) {
+        return filterConfiguration != null &&
+                filterConfiguration.getScriptedFilter() != null &&
+                filterConfiguration.getScriptedFilter().getScript() != null;
+    }
+
+    private static boolean hasSimpleFilters(FilterConfiguration filterConfiguration) {
+        return filterConfiguration != null &&
+                CollectionUtils.isNotEmpty(filterConfiguration.getSimpleFilters());
+    }
+
+    private static boolean findingPassesFilter(FilterInput finding, List<Filter> filters) {
+        Map<Filter.Type, List<String>> valuesByType = groupFilterValuesByFilterType(filters);
+
+        return fieldMatches(finding.getStatus(), valuesByType.get(Filter.Type.STATUS)) &&
+                fieldMatches(finding.getState(), valuesByType.get(Filter.Type.STATE)) &&
+                fieldMatches(finding.getSeverity(), valuesByType.get(Filter.Type.SEVERITY)) &&
+                fieldMatches(finding.getCweId(), valuesByType.get(Filter.Type.CWE)) &&
+                fieldMatches(finding.getCategory(), valuesByType.get(Filter.Type.TYPE));
+    }
+
+    private static Map<Filter.Type, List<String>> groupFilterValuesByFilterType(List<Filter> filters) {
+        // First prepare an empty list for each Filter.Type enum member.
+        Map<Filter.Type, List<String>> valuesByType = Arrays.stream(Filter.Type.values())
+                .collect(Collectors.toMap(Function.identity(),
+                        filterType -> new ArrayList<>()));
+
+        // Populate the lists using the provided filters.
+        for (Filter filter : filters) {
+            List<String> targetList = valuesByType.get(filter.getType());
+            targetList.add(filter.getValue().toUpperCase(Locale.ROOT));
+        }
+
+        return valuesByType;
+    }
+
     private static void rethrowWithDetailedMessage(GroovyRuntimeException cause) {
         List<String> existingFields = Arrays.stream(FilterInput.class.getDeclaredFields())
                 .map(Field::getName)
@@ -143,5 +131,11 @@ public class FilterValidatorImpl implements FilterValidator {
     private static boolean fieldMatches(String fieldValue, List<String> allowedValues) {
         return allowedValues.isEmpty() ||
                 allowedValues.contains(fieldValue.toUpperCase(Locale.ROOT));
+    }
+
+    private static void logFilteringResult(FilterInput finding, boolean passes) {
+        String idForLog = StringUtils.isNotEmpty(finding.getId()) ? finding.getId() : "n/a";
+        String message = (passes ? "passes" : "does not pass");
+        log.debug("Finding (ID: {}) {} the filter.", idForLog, message);
     }
 }
