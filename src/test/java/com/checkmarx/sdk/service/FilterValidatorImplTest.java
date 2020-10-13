@@ -27,33 +27,36 @@ public class FilterValidatorImplTest {
     private static final String SEVERITY_HIGH = "HIGH";
     private static final String SEVERITY_MEDIUM = "MEDIUM";
     private static final String SEVERITY_LOW = "LOW";
-    private static final String NAME1 = "CROSS_SITE_HISTORY_MANIPULATION";
-    private static final String NAME2 = "CLIENT_POTENTIAL_XSS";
-    public static final String PERFORMANCE_TEST_SCRIPT = "finding.severity == 'HIGH' || finding.severity == 'MEDIUM'";
-    public static final Duration MAX_ALLOWED_DURATION = Duration.ofSeconds(10);
+    private static final String CATEGORY1 = "CROSS_SITE_HISTORY_MANIPULATION";
+    private static final String CATEGORY2 = "CLIENT_POTENTIAL_XSS";
+    private static final String CWE1 = "203";
+    private static final String CWE2 = "611";
+    private static final String PERFORMANCE_TEST_SCRIPT = "finding.severity == 'HIGH' || finding.severity == 'MEDIUM'";
+    private static final Duration MAX_ALLOWED_DURATION = Duration.ofSeconds(10);
 
     @Test
     public void passesFilter_scriptTypicalExample() {
         String scriptText = "finding.severity == 'HIGH' || (finding.severity == 'MEDIUM' && finding.state == 'URGENT')";
 
         Script script = parse(scriptText);
-        verifyScriptResult(script, SEVERITY_HIGH, STATUS_RECURRENT, STATE_URGENT_NAME, NAME1, true);
-        verifyScriptResult(script, SEVERITY_MEDIUM, STATUS_RECURRENT, STATE_URGENT_NAME, NAME1, true);
-        verifyScriptResult(script, SEVERITY_MEDIUM, STATUS_NEW, STATE_VERIFY_NAME, NAME1, false);
-        verifyScriptResult(script, SEVERITY_LOW, STATUS_NEW, STATE_URGENT_NAME, NAME1, false);
+        verifyScriptResult(script, SEVERITY_HIGH, STATUS_RECURRENT, STATE_URGENT_NAME, CATEGORY1, CWE1, true);
+        verifyScriptResult(script, SEVERITY_MEDIUM, STATUS_RECURRENT, STATE_URGENT_NAME, CATEGORY1, CWE1, true);
+        verifyScriptResult(script, SEVERITY_MEDIUM, STATUS_NEW, STATE_VERIFY_NAME, CATEGORY1, CWE1, false);
+        verifyScriptResult(script, SEVERITY_LOW, STATUS_NEW, STATE_URGENT_NAME, CATEGORY1, CWE1, false);
     }
 
     @Test
     public void passesFilter_allPropertiesInScript() {
         String scriptText = "finding.severity == 'MEDIUM' && finding.state == 'TO_VERIFY' && finding.status == 'NEW'" +
-                "&& finding.category == 'CROSS_SITE_HISTORY_MANIPULATION'";
+                "&& finding.cwe == '203' && finding.category == 'CROSS_SITE_HISTORY_MANIPULATION'";
 
         Script script = parse(scriptText);
-        verifyScriptResult(script, SEVERITY_MEDIUM, STATUS_NEW, STATE_VERIFY_NAME, NAME1, true);
-        verifyScriptResult(script, SEVERITY_HIGH, STATUS_NEW, STATE_VERIFY_NAME, NAME1, false);
-        verifyScriptResult(script, SEVERITY_MEDIUM, STATUS_RECURRENT, STATE_VERIFY_NAME, NAME1, false);
-        verifyScriptResult(script, SEVERITY_MEDIUM, STATUS_NEW, STATE_URGENT_NAME, NAME1, false);
-        verifyScriptResult(script, SEVERITY_MEDIUM, STATUS_NEW, STATE_VERIFY_NAME, NAME2, false);
+        verifyScriptResult(script, SEVERITY_MEDIUM, STATUS_NEW, STATE_VERIFY_NAME, CATEGORY1, CWE1, true);
+        verifyScriptResult(script, SEVERITY_HIGH, STATUS_NEW, STATE_VERIFY_NAME, CATEGORY1, CWE1, false);
+        verifyScriptResult(script, SEVERITY_MEDIUM, STATUS_RECURRENT, STATE_VERIFY_NAME, CATEGORY1, CWE1, false);
+        verifyScriptResult(script, SEVERITY_MEDIUM, STATUS_NEW, STATE_URGENT_NAME, CATEGORY1, CWE1, false);
+        verifyScriptResult(script, SEVERITY_MEDIUM, STATUS_NEW, STATE_VERIFY_NAME, CATEGORY2, CWE1, false);
+        verifyScriptResult(script, SEVERITY_MEDIUM, STATUS_NEW, STATE_VERIFY_NAME, CATEGORY1, CWE2, false);
     }
 
     @Test
@@ -93,10 +96,10 @@ public class FilterValidatorImplTest {
         long start = System.currentTimeMillis();
 
         for (int i = 0; i < EVALUATION_COUNT; i++) {
-            verifyScriptResult(script, SEVERITY_MEDIUM, STATUS_NEW, STATE_VERIFY_NAME, NAME1, true);
-            verifyScriptResult(script, SEVERITY_LOW, STATUS_RECURRENT, STATE_URGENT_NAME, NAME1, false);
-            verifyScriptResult(script, SEVERITY_HIGH, STATUS_NEW, STATE_VERIFY_NAME, NAME1, true);
-            verifyScriptResult(script, SEVERITY_HIGH, STATUS_RECURRENT, STATE_URGENT_NAME, NAME1, true);
+            verifyScriptResult(script, SEVERITY_MEDIUM, STATUS_NEW, STATE_VERIFY_NAME, CATEGORY1, CWE1, true);
+            verifyScriptResult(script, SEVERITY_LOW, STATUS_RECURRENT, STATE_URGENT_NAME, CATEGORY1, CWE1, false);
+            verifyScriptResult(script, SEVERITY_HIGH, STATUS_NEW, STATE_VERIFY_NAME, CATEGORY1, CWE1, true);
+            verifyScriptResult(script, SEVERITY_HIGH, STATUS_RECURRENT, STATE_URGENT_NAME, CATEGORY1, CWE1, true);
         }
         long end = System.currentTimeMillis();
 
@@ -104,28 +107,31 @@ public class FilterValidatorImplTest {
         log.info("Evaluation took {}.", actualDuration);
 
         assertTrue(MAX_ALLOWED_DURATION.compareTo(actualDuration) >= 0,
-                String.format("Filter evaluation took too long (more than %s).", MAX_ALLOWED_DURATION));    }
+                String.format("Filter evaluation took too long (more than %s).", MAX_ALLOWED_DURATION));
+    }
 
     @Test
     public void passesFilter_allSimpleFilters() {
         Filter severity = Filter.builder().type(Filter.Type.SEVERITY).value(SEVERITY_HIGH).build();
-        Filter type = Filter.builder().type(Filter.Type.TYPE).value(NAME1).build();
+        Filter cwe = Filter.builder().type(Filter.Type.CWE).value(CWE1).build();
+        Filter type = Filter.builder().type(Filter.Type.TYPE).value(CATEGORY1).build();
         Filter status = Filter.builder().type(Filter.Type.STATUS).value(STATUS_NEW).build();
         Filter state = Filter.builder().type(Filter.Type.STATE).value(STATE_URGENT_NAME).build();
-        List<Filter> filters = Arrays.asList(severity, type, status, state);
+        List<Filter> filters = Arrays.asList(severity, cwe, type, status, state);
 
-        verifySimpleFilterResult(filters, SEVERITY_HIGH, STATUS_NEW, STATE_URGENT_NAME, NAME1, true);
-        verifySimpleFilterResult(filters, SEVERITY_MEDIUM, STATUS_NEW, STATE_URGENT_NAME, NAME1, false);
-        verifySimpleFilterResult(filters, SEVERITY_HIGH, STATUS_RECURRENT, STATE_URGENT_NAME, NAME1, false);
-        verifySimpleFilterResult(filters, SEVERITY_HIGH, STATUS_NEW, STATE_VERIFY_NAME, NAME1, false);
-        verifySimpleFilterResult(filters, SEVERITY_HIGH, STATUS_NEW, STATE_URGENT_NAME, NAME2, false);
+        verifySimpleFilterResult(filters, SEVERITY_HIGH, STATUS_NEW, STATE_URGENT_NAME, CATEGORY1, CWE1, true);
+        verifySimpleFilterResult(filters, SEVERITY_MEDIUM, STATUS_NEW, STATE_URGENT_NAME, CATEGORY1, CWE1, false);
+        verifySimpleFilterResult(filters, SEVERITY_HIGH, STATUS_RECURRENT, STATE_URGENT_NAME, CATEGORY1, CWE1, false);
+        verifySimpleFilterResult(filters, SEVERITY_HIGH, STATUS_NEW, STATE_VERIFY_NAME, CATEGORY1, CWE1, false);
+        verifySimpleFilterResult(filters, SEVERITY_HIGH, STATUS_NEW, STATE_URGENT_NAME, CATEGORY2, CWE1, false);
+        verifySimpleFilterResult(filters, SEVERITY_HIGH, STATUS_NEW, STATE_URGENT_NAME, CATEGORY1, CWE2, false);
     }
 
     private void validateExpectedError(String scriptWithRuntimeError) {
         Script script = parse(scriptWithRuntimeError);
 
-        FilterInput finding = createFilterInput(SEVERITY_LOW, NAME1, STATUS_NEW, STATE_URGENT_NAME); 
-        
+        FilterInput finding = createFilterInput(SEVERITY_LOW, CATEGORY1, STATUS_NEW, STATE_URGENT_NAME, CWE1);
+
         FilterConfiguration filterConfiguration = createFilterConfiguration(script);
         FilterValidatorImpl validator = new FilterValidatorImpl();
 
@@ -137,11 +143,12 @@ public class FilterValidatorImplTest {
         }
     }
 
-    private static FilterInput createFilterInput(String severity, String name, String status, String stateName) {
+    private static FilterInput createFilterInput(String severity, String category, String status, String stateName, String cweId) {
         return FilterInput.builder()
                 .id("9389081")
+                .category(category)
+                .cwe(cweId)
                 .severity(severity)
-                .category(name)
                 .status(status)
                 .state(stateName)
                 .build();
@@ -156,9 +163,10 @@ public class FilterValidatorImplTest {
                                            String severity,
                                            String status,
                                            String state,
-                                           String name,
+                                           String category,
+                                           String cweId,
                                            boolean expectedResult) {
-        FilterInput finding = createFilterInput(severity, name, status, state);
+        FilterInput finding = createFilterInput(severity, category, status, state, cweId);
         FilterConfiguration filterConfiguration = createFilterConfiguration(script);
 
         FilterValidatorImpl validator = new FilterValidatorImpl();
@@ -170,9 +178,10 @@ public class FilterValidatorImplTest {
                                                  String severity,
                                                  String status,
                                                  String state,
-                                                 String name,
+                                                 String category,
+                                                 String cweId,
                                                  boolean expectedResult) {
-        FilterInput finding = createFilterInput(severity, name, status, state);
+        FilterInput finding = createFilterInput(severity, category, status, state, cweId);
         FilterValidatorImpl filterValidator = new FilterValidatorImpl();
         FilterConfiguration filterConfiguration = FilterConfiguration.builder().simpleFilters(filters).build();
         boolean passes = filterValidator.passesFilter(finding, filterConfiguration);

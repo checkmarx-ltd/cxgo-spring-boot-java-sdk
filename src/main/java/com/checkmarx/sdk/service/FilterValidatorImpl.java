@@ -96,7 +96,7 @@ public class FilterValidatorImpl implements FilterValidator {
         return fieldMatches(finding.getStatus(), valuesByType.get(Filter.Type.STATUS)) &&
                 fieldMatches(finding.getState(), valuesByType.get(Filter.Type.STATE)) &&
                 fieldMatches(finding.getSeverity(), valuesByType.get(Filter.Type.SEVERITY)) &&
-                fieldMatches(finding.getCweId(), valuesByType.get(Filter.Type.CWE)) &&
+                fieldMatches(finding.getCwe(), valuesByType.get(Filter.Type.CWE)) &&
                 fieldMatches(finding.getCategory(), valuesByType.get(Filter.Type.TYPE));
     }
 

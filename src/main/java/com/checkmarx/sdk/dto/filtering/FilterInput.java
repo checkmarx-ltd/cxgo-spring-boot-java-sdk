@@ -27,25 +27,25 @@ public class FilterInput {
     private final String id;
 
     /**
-     * This field is also known as 'title'.
+     * This field is also known as 'title' or 'query name', depending on a vulnerability scanner.
+     * Sample value: "SQL_Injection".
      */
     private final String category;
 
-    private final String cweId;
+    private final String cwe;
     private final String severity;
     private final String status;
     private final String state;
 
 
-    public static FilterInput getInstance(SASTScanResult sastScanResult, OdScanResultItem odScanResultItem) {
-        // CxOD currently does not have CWE info
-        // TODO: update this when CWE info is available
+    public static FilterInput getInstance(SASTScanResult mainResultInfo, OdScanResultItem additionalResultInfo) {
         return FilterInput.builder()
-                .category(odScanResultItem.getTitle().toUpperCase(Locale.ROOT))
-                .id(sastScanResult.getId().toString())
-                .severity(sastScanResult.getSeverity().getSeverity())
-                .state(getStateName(sastScanResult))
-                .status(sastScanResult.getStatus().getStatus())
+                .id(mainResultInfo.getId().toString())
+                .category(additionalResultInfo.getTitle().toUpperCase(Locale.ROOT))
+                .cwe(mainResultInfo.getCwe())
+                .severity(mainResultInfo.getSeverity().getSeverity())
+                .status(mainResultInfo.getStatus().getStatus())
+                .state(getStateName(mainResultInfo))
                 .build();
     }
 
