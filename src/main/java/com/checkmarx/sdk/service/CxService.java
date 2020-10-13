@@ -234,7 +234,6 @@ public class CxService implements CxClient{
      *
      * @param scanStorage Response Object from CxGo for S3 details
      * @param file File to upload
-     * @throws CheckmarxException
      */
     private void uploadScanFile(Storage scanStorage, File file) throws CheckmarxException{
         try {
@@ -268,9 +267,7 @@ public class CxService implements CxClient{
     /**
      * Searches the navigation tree for the Business Unit.
      *
-     * @param teamPath
      * @return the Business Unit ID or -1
-     * @throws CheckmarxException
      */
     @Override
     public String getTeamId(String teamPath) throws CheckmarxException {
@@ -334,8 +331,7 @@ public class CxService implements CxClient{
                     HttpMethod.GET,
                     httpEntity,
                     OdNavigationTree.class);
-            OdNavigationTree tree = response.getBody();
-            return tree;
+            return response.getBody();
         } catch(HttpStatusCodeException e) {
             log.error("Error occurred while retrieving the navigation tree.");
             log.error(ExceptionUtils.getStackTrace(e));
@@ -356,17 +352,22 @@ public class CxService implements CxClient{
         Integer buId = scan.getBusinessUnitId();
         Integer appId = scan.getApplicationId();
 
-        Map<String, OdScanResultItem> scanResultItems = getScanResultsPage(projectId, scanId);
-        com.checkmarx.sdk.dto.od.ScanResults scanResults = getScanResults(scanId);
+        com.checkmarx.sdk.dto.od.ScanResults resultFromAllEngines = getScanResults(scanId);
 
         List<ScanResults.XIssue> xIssues = new ArrayList<>();
         //SAST
-        if(scanResults.getSast() != null){
+        List<SASTScanResult> mainFindingInfos = Optional.ofNullable(resultFromAllEngines)
+                .map(com.checkmarx.sdk.dto.od.ScanResults::getSast)
+                .orElse(null);
+
+        if(mainFindingInfos != null){
+            Map<String, OdScanResultItem> additionalResultInfos = getScanResultsPage(projectId, scanId);
             Map<String, Integer> policyCount = new HashMap<>();
+            log.debug("SAST finding count before filtering: {}", mainFindingInfos.size());
             log.info("Processing SAST results");
-            scanResults.getSast().stream()
-                    .filter(onlyResultsThatMatchFilter(scanResultItems, filter))
-                    .forEach(i -> handleSastIssue(xIssues, i, scanResultItems, projectId, scanId, policyCount));
+            mainFindingInfos.stream()
+                    .filter(onlyResultsThatMatchFilter(additionalResultInfos, filter))
+                    .forEach(mainResultInfo -> handleSastIssue(xIssues, mainResultInfo, additionalResultInfos, projectId, scanId, policyCount));
             CxScanSummary scanSummary = new CxScanSummary();
             Map<String, Object> sast = (Map<String, Object>) scan.getEngines().get("sast");
             if(sast != null){
@@ -386,12 +387,12 @@ public class CxService implements CxClient{
         }
 
         //SCA
-        if(scanResults.getSca() != null){
+        if(resultFromAllEngines.getSca() != null){
             List<Finding> findings = new ArrayList<>();
             List<Package> packages = new ArrayList<>();
 
             log.info("Processing SCA results");
-            scanResults.getSca().stream()
+            resultFromAllEngines.getSca().stream()
                     .filter( i -> filterIssue(i, filter))
                     .forEach( i -> handleScaIssue(xIssues, findings, packages, i));
             SCAResults scaResults = new SCAResults();
@@ -399,8 +400,8 @@ public class CxService implements CxClient{
 
             scaResults.setFindings(findings);
             scaResults.setPackages(packages);
-            if (!scanResults.getSca().isEmpty()) {
-                scaResults.setScanId(scanResults.getSca().get(0).getScanId().toString());
+            if (!resultFromAllEngines.getSca().isEmpty()) {
+                scaResults.setScanId(resultFromAllEngines.getSca().get(0).getScanId().toString());
             }
             Map<String, Object> sca = (Map<String, Object>) scan.getEngines().get("sca");
             if(sca != null){
@@ -431,12 +432,12 @@ public class CxService implements CxClient{
         return results.build();
     }
 
-    private Predicate<SASTScanResult> onlyResultsThatMatchFilter(Map<String, OdScanResultItem> scanResultItems,
+    private Predicate<SASTScanResult> onlyResultsThatMatchFilter(Map<String, OdScanResultItem> additionalResultInfos,
                                                                  FilterConfiguration filter) {
-        return sastScanResult -> {
-            String resultId = sastScanResult.getId().toString();
-            OdScanResultItem odScanResultItem = scanResultItems.get(resultId);
-            FilterInput filterInput = FilterInput.getInstance(sastScanResult, odScanResultItem);
+        return mainResultInfo -> {
+            String resultId = mainResultInfo.getId().toString();
+            OdScanResultItem additionalResultInfo = additionalResultInfos.get(resultId);
+            FilterInput filterInput = FilterInput.getInstance(mainResultInfo, additionalResultInfo);
             return filterValidator.passesFilter(filterInput, filter);
         };
     }
@@ -520,9 +521,7 @@ public class CxService implements CxClient{
         finding.setSeverity(Severity.valueOf(scaResult.getSeverity().getSeverity().toUpperCase()));
         finding.setSeverity(Severity.valueOf(scaResult.getSeverity().getSeverity().toUpperCase()));
 
-        if(findings.stream().noneMatch(f->{
-            return f.getPackageId().equalsIgnoreCase(finding.getPackageId());
-        })){
+        if(findings.stream().noneMatch(f-> f.getPackageId().equalsIgnoreCase(finding.getPackageId()))){
             findings.add(finding);
             packages.add(pkg);
             List<ScanResults.ScaDetails> scaDetails = new ArrayList<>();
@@ -777,9 +776,6 @@ public class CxService implements CxClient{
      * If this is used for CxFlow /scanresults API calls. The ScanID will only contain the
      * scan record if CxOD hasn't been restarted since the scan was run. This ensures the
      * scan record is available in memory so that CxService can correctly look up the values.
-     *
-     * @param scanID
-     * @param projectID
      */
     private void setupScanIdMap(Integer scanID, Integer projectID) {
         CxScanParams csp = getScanProbeByProject(projectID.toString());
@@ -801,10 +797,9 @@ public class CxService implements CxClient{
     }
 
     /**
-     * Examins the current scan scanProbeMap and returns the record matching the teamID
-     * 'if' it exsits.
+     * Examines the current scan scanProbeMap and returns the record matching the teamID
+     * 'if' it exists.
      *
-     * @param teamID
      * @return the CxScanParams record
      */
     private CxScanParams getScanProbeByTeam(String teamID) {
@@ -822,10 +817,9 @@ public class CxService implements CxClient{
     }
 
     /**
-     * Examins the current scan scanProbeMap and returns the record matching the teamID
-     * 'if' it exsits.
+     * Examines the current scan scanProbeMap and returns the record matching the teamID
+     * 'if' it exists.
      *
-     * @param projectID
      * @return the CxScanParams record
      */
     private CxScanParams getScanProbeByProject(String projectID) {
