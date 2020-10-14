@@ -9,10 +9,12 @@ import groovy.lang.GroovyRuntimeException;
 import groovy.lang.GroovyShell;
 import groovy.lang.Script;
 import lombok.extern.slf4j.Slf4j;
+import org.junit.Assert;
 import org.junit.Test;
 
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -125,6 +127,36 @@ public class FilterValidatorTest {
         verifySimpleFilterResult(filters, SEVERITY_HIGH, STATUS_NEW, STATE_VERIFY_NAME, CATEGORY1, CWE1, false);
         verifySimpleFilterResult(filters, SEVERITY_HIGH, STATUS_NEW, STATE_URGENT_NAME, CATEGORY2, CWE1, false);
         verifySimpleFilterResult(filters, SEVERITY_HIGH, STATUS_NEW, STATE_URGENT_NAME, CATEGORY1, CWE2, false);
+    }
+
+    @Test
+    public void passesFilter_score() {
+        verifyScoreFilter(6.12, "6.1", true);
+        verifyScoreFilter(6.12, "6.12", true);
+        verifyScoreFilter(0.01, "0.01", true);
+        verifyScoreFilter(3D, "5.7", false);
+        verifyScoreFilter(0D, "0.02", false);
+        verifyScoreFilter(null, "5.7", true);
+        verifyScoreFilter(6.1, null, true);
+        verifyScoreFilter(6.1, "I'm not a number", true);
+        verifyScoreFilter(6.1, "", true);
+    }
+
+    private void verifyScoreFilter(Double valueToCheck, String valueFromFilter, boolean shouldPass) {
+        Filter score = Filter.builder().type(Filter.Type.SCORE).value(valueFromFilter).build();
+
+        FilterConfiguration filterConfig = FilterConfiguration.builder()
+                .simpleFilters(Collections.singletonList(score))
+                .build();
+
+        FilterInput input = FilterInput.builder().id("424").score(valueToCheck).build();
+
+        String message = String.format("Unexpected score filter result (valueToCheck: %f, valueFromFilter: %s)",
+                valueToCheck, valueFromFilter);
+
+        boolean actuallyPassed = new FilterValidator().passesFilter(input, filterConfig);
+
+        Assert.assertEquals(message, shouldPass, actuallyPassed);
     }
 
     private void validateExpectedError(String scriptWithRuntimeError) {

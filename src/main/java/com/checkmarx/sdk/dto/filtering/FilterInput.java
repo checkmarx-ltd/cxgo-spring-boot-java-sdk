@@ -16,6 +16,8 @@ import java.util.stream.Collectors;
 
 /**
  * Standardized input to {@link com.checkmarx.sdk.service.FilterValidator}, independent of specific scanner type.
+ *
+ * Some of the fields may not be initialized for a specific scanner type.
  */
 @Builder
 @Getter

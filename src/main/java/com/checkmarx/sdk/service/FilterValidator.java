@@ -14,6 +14,8 @@ import org.springframework.stereotype.Service;
 
 import javax.validation.constraints.NotNull;
 import java.lang.reflect.Field;
+import java.text.NumberFormat;
+import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -32,6 +34,8 @@ public class FilterValidator {
      * An object variable with this name will be passed to the filtering script.
      */
     private static final String INPUT_VARIABLE_NAME = "finding";
+
+    private final NumberFormat numberFormat = NumberFormat.getInstance(Locale.ROOT);
 
     /**
      * @param filterConfiguration filters to check against
@@ -80,7 +84,7 @@ public class FilterValidator {
         }
     }
 
-    private static boolean passesSimpleFilter(FilterInput finding, FilterConfiguration filterConfiguration) {
+    private boolean passesSimpleFilter(FilterInput finding, FilterConfiguration filterConfiguration) {
         List<Filter> filters = filterConfiguration.getSimpleFilters();
         return CollectionUtils.isEmpty(filters) || findingPassesFilter(finding, filters);
     }
@@ -96,14 +100,42 @@ public class FilterValidator {
                 CollectionUtils.isNotEmpty(filterConfiguration.getSimpleFilters());
     }
 
-    private static boolean findingPassesFilter(FilterInput finding, List<Filter> filters) {
+    private boolean findingPassesFilter(FilterInput finding, List<Filter> filters) {
         Map<Filter.Type, List<String>> valuesByType = groupFilterValuesByFilterType(filters);
 
         return fieldMatches(finding.getStatus(), valuesByType.get(Filter.Type.STATUS)) &&
                 fieldMatches(finding.getState(), valuesByType.get(Filter.Type.STATE)) &&
                 fieldMatches(finding.getSeverity(), valuesByType.get(Filter.Type.SEVERITY)) &&
                 fieldMatches(finding.getCwe(), valuesByType.get(Filter.Type.CWE)) &&
-                fieldMatches(finding.getCategory(), valuesByType.get(Filter.Type.TYPE));
+                fieldMatches(finding.getCategory(), valuesByType.get(Filter.Type.TYPE)) &&
+                scoreIsAtLeast(finding.getScore(), valuesByType.get(Filter.Type.SCORE));
+    }
+
+    private boolean scoreIsAtLeast(Double scoreToCheck, List<String> filterValues) {
+        boolean passes = true;
+        Double minAllowedScore;
+        if (scoreToCheck != null && (minAllowedScore = getNumericScore(filterValues)) != null) {
+            log.info("Validating finding against filter of type {}: [{}]", Filter.Type.SCORE, minAllowedScore);
+            passes = (scoreToCheck >= minAllowedScore);
+        }
+        return passes;
+    }
+
+    private Double getNumericScore(List<String> filterValues) {
+        Double result = null;
+        if (!CollectionUtils.isEmpty(filterValues)) {
+            if (filterValues.size() == 1) {
+                String scoreString = filterValues.get(0);
+                try {
+                    result = numberFormat.parse(scoreString).doubleValue();
+                } catch (ParseException e) {
+                    log.warn("Invalid {} filter value: '{}', ignoring.", Filter.Type.SCORE, scoreString);
+                }
+            } else {
+                log.warn("More than 1 {} filter is specified, ignoring.", Filter.Type.SCORE);
+            }
+        }
+        return result;
     }
 
     private static Map<Filter.Type, List<String>> groupFilterValuesByFilterType(List<Filter> filters) {
@@ -115,7 +147,8 @@ public class FilterValidator {
         // Populate the lists using the provided filters.
         for (Filter filter : filters) {
             List<String> targetList = valuesByType.get(filter.getType());
-            targetList.add(filter.getValue().toUpperCase(Locale.ROOT));
+            String safeValue = StringUtils.defaultString(filter.getValue());
+            targetList.add(safeValue.toUpperCase(Locale.ROOT));
         }
 
         return valuesByType;
