@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Slf4j
-public class FilterValidatorImplTest {
+public class FilterValidatorTest {
     private static final String STATUS_RECURRENT = "RECURRENT";
     private static final String STATUS_NEW = "NEW";
     private static final String STATE_URGENT_NAME = "URGENT";
@@ -133,7 +133,7 @@ public class FilterValidatorImplTest {
         FilterInput finding = createFilterInput(SEVERITY_LOW, CATEGORY1, STATUS_NEW, STATE_URGENT_NAME, CWE1);
 
         FilterConfiguration filterConfiguration = createFilterConfiguration(script);
-        FilterValidatorImpl validator = new FilterValidatorImpl();
+        FilterValidator validator = new FilterValidator();
 
         try {
             validator.passesFilter(finding, filterConfiguration);
@@ -169,7 +169,7 @@ public class FilterValidatorImplTest {
         FilterInput finding = createFilterInput(severity, category, status, state, cweId);
         FilterConfiguration filterConfiguration = createFilterConfiguration(script);
 
-        FilterValidatorImpl validator = new FilterValidatorImpl();
+        FilterValidator validator = new FilterValidator();
         boolean actualResult = validator.passesFilter(finding, filterConfiguration);
         assertEquals(expectedResult, actualResult, "Unexpected script filtering result.");
     }
@@ -182,7 +182,7 @@ public class FilterValidatorImplTest {
                                                  String cweId,
                                                  boolean expectedResult) {
         FilterInput finding = createFilterInput(severity, category, status, state, cweId);
-        FilterValidatorImpl filterValidator = new FilterValidatorImpl();
+        FilterValidator filterValidator = new FilterValidator();
         FilterConfiguration filterConfiguration = FilterConfiguration.builder().simpleFilters(filters).build();
         boolean passes = filterValidator.passesFilter(finding, filterConfiguration);
         assertEquals(expectedResult, passes, "Unexpected simple filtering result.");
