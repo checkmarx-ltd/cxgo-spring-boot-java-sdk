@@ -36,7 +36,7 @@ public class CxServiceIT {
     private CxAuthService authService;
 
     @Test
-    public void Login() {
+    public void login() {
         try {
             HttpHeaders token = authService.createAuthHeaders();
             assertNotNull(token);
@@ -46,7 +46,7 @@ public class CxServiceIT {
     }
 
     @Test
-    public void GetTeams() {
+    public void getTeams() {
         try {
             String teamId = service.getTeamId(properties.getTeam());
             assertNotNull(teamId);
@@ -56,7 +56,7 @@ public class CxServiceIT {
     }
 
     @Test
-    public void GetProject() {
+    public void getProject() {
         try {
             String teamId = service.getTeamId(properties.getTeam());
             Integer projId = service.getProjectId(teamId, "CircleCI");
@@ -70,7 +70,7 @@ public class CxServiceIT {
     }
 
     @Test
-    public void GitClone() throws CheckmarxException {
+    public void gitClone() throws CheckmarxException {
         CxScanParams params = new CxScanParams();
         params.setProjectName("CircleCI");
         params.setTeamId("1");
@@ -82,7 +82,7 @@ public class CxServiceIT {
     }
 
     @Test
-    public void CompleteScanFlow() throws CheckmarxException {
+    public void completeScanFlow() throws CheckmarxException {
         String teamId = service.getTeamId(properties.getTeam());
         Integer projectId = service.getProjectId(teamId, "CircleCI");
         CxScanParams params = new CxScanParams();
