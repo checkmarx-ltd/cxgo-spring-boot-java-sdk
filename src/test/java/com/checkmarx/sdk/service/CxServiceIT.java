@@ -9,6 +9,7 @@ import com.checkmarx.sdk.dto.filtering.FilterConfiguration;
 import com.checkmarx.sdk.dto.od.Scan;
 import com.checkmarx.sdk.exception.CheckmarxException;
 import com.checkmarx.sdk.exception.InvalidCredentialsException;
+import org.apache.commons.lang.StringUtils;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -69,44 +70,36 @@ public class CxServiceIT {
     }
 
     @Test
-    public void GitClone() {
-        try {
-            CxScanParams params = new CxScanParams();
-            params.setProjectName("CircleCI");
-            params.setTeamId("1");
-            params.setGitUrl("https://github.com/Custodela/Riches.git");
-            params.setBranch("refs/heads/master");
-            params.setSourceType(CxScanParams.Type.GIT);
-            repoFileService.prepareRepoFile(params);
-        } catch (CheckmarxException e) {
-            e.printStackTrace();
-        }
+    public void GitClone() throws CheckmarxException {
+        CxScanParams params = new CxScanParams();
+        params.setProjectName("CircleCI");
+        params.setTeamId("1");
+        params.setGitUrl("https://github.com/Custodela/Riches.git");
+        params.setBranch("refs/heads/master");
+        params.setSourceType(CxScanParams.Type.GIT);
+        String zipFilePath = repoFileService.prepareRepoFile(params);
+        assertTrue("Zip file path is empty.", StringUtils.isNotEmpty(zipFilePath));
     }
 
     @Test
-    public void CompleteScanFlow() {
-        try {
-            String teamId = service.getTeamId(properties.getTeam());
-            Integer projectId = service.getProjectId(teamId, "CircleCI");
-            CxScanParams params = new CxScanParams();
-            params.setProjectName("CircleCI");
-            params.setTeamId(teamId);
-            params.setProjectId(projectId);
-            params.setGitUrl("https://github.com/Custodela/Riches.git");
-            params.setBranch("refs/heads/master");
-            params.setSourceType(CxScanParams.Type.GIT);
-            //run the scan and wait for it to finish
-            Integer x = service.createScan(params, "CxFlow Scan");
-            service.waitForScanCompletion(x);
-            FilterConfiguration filterConfiguration = FilterConfiguration.builder()
-                    .simpleFilters(Collections.singletonList(new Filter(Filter.Type.SEVERITY, "High")))
-                    .build();
-            //generate the results
-            ScanResults results = service.getReportContentByScanId(x, filterConfiguration);
-            assertNotNull(results);
-        }catch (CheckmarxException e){
-            fail("Unexpected CheckmarxException");
-        }
+    public void CompleteScanFlow() throws CheckmarxException {
+        String teamId = service.getTeamId(properties.getTeam());
+        Integer projectId = service.getProjectId(teamId, "CircleCI");
+        CxScanParams params = new CxScanParams();
+        params.setProjectName("CircleCI");
+        params.setTeamId(teamId);
+        params.setProjectId(projectId);
+        params.setGitUrl("https://github.com/Custodela/Riches.git");
+        params.setBranch("refs/heads/master");
+        params.setSourceType(CxScanParams.Type.GIT);
+        //run the scan and wait for it to finish
+        Integer x = service.createScan(params, "CxFlow Scan");
+        service.waitForScanCompletion(x);
+        FilterConfiguration filterConfiguration = FilterConfiguration.fromSimpleFilters(
+                Collections.singletonList(new Filter(Filter.Type.SEVERITY, "High")));
+        //generate the results
+        ScanResults results = service.getReportContentByScanId(x, filterConfiguration);
+        assertNotNull(results);
     }
 
 }

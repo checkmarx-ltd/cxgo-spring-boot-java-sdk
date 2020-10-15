@@ -1,7 +1,7 @@
 package com.checkmarx.sdk.service;
 
 import com.checkmarx.sdk.dto.Filter;
-import com.checkmarx.sdk.dto.filtering.FilterConfiguration;
+import com.checkmarx.sdk.dto.filtering.EngineFilterConfiguration;
 import com.checkmarx.sdk.dto.filtering.FilterInput;
 import com.checkmarx.sdk.exception.CheckmarxRuntimeException;
 import groovy.lang.Binding;
@@ -41,7 +41,7 @@ public class FilterValidator {
      * @param filterConfiguration filters to check against
      * @return a value indicating whether the finding meets the filter criteria
      */
-    public boolean passesFilter(@NotNull FilterInput finding, FilterConfiguration filterConfiguration) {
+    public boolean passesFilter(@NotNull FilterInput finding, EngineFilterConfiguration filterConfiguration) {
         boolean result;
 
         boolean hasSimpleFilters = hasSimpleFilters(filterConfiguration);
@@ -63,7 +63,7 @@ public class FilterValidator {
         return result;
     }
 
-    private static boolean passesScriptedFilter(FilterInput finding, FilterConfiguration filterConfiguration) {
+    private static boolean passesScriptedFilter(FilterInput finding, EngineFilterConfiguration filterConfiguration) {
         Script script = filterConfiguration.getScriptedFilter().getScript();
         Binding binding = new Binding();
         binding.setVariable(INPUT_VARIABLE_NAME, finding);
@@ -84,18 +84,18 @@ public class FilterValidator {
         }
     }
 
-    private boolean passesSimpleFilter(FilterInput finding, FilterConfiguration filterConfiguration) {
+    private boolean passesSimpleFilter(FilterInput finding, EngineFilterConfiguration filterConfiguration) {
         List<Filter> filters = filterConfiguration.getSimpleFilters();
         return CollectionUtils.isEmpty(filters) || findingPassesFilter(finding, filters);
     }
 
-    private static boolean hasScriptedFilter(FilterConfiguration filterConfiguration) {
+    private static boolean hasScriptedFilter(EngineFilterConfiguration filterConfiguration) {
         return filterConfiguration != null &&
                 filterConfiguration.getScriptedFilter() != null &&
                 filterConfiguration.getScriptedFilter().getScript() != null;
     }
 
-    private static boolean hasSimpleFilters(FilterConfiguration filterConfiguration) {
+    private static boolean hasSimpleFilters(EngineFilterConfiguration filterConfiguration) {
         return filterConfiguration != null &&
                 CollectionUtils.isNotEmpty(filterConfiguration.getSimpleFilters());
     }

@@ -450,7 +450,7 @@ public class CxService implements CxClient{
             String resultId = mainResultInfo.getId().toString();
             OdScanResultItem additionalResultInfo = additionalResultInfos.get(resultId);
             FilterInput filterInput = FilterInput.getInstance(mainResultInfo, additionalResultInfo);
-            return filterValidator.passesFilter(filterInput, filter);
+            return filterValidator.passesFilter(filterInput, filter.getSastFilters());
         };
     }
 
@@ -458,7 +458,7 @@ public class CxService implements CxClient{
     private Predicate<? super SCAScanResult> onlyScaResultsThatMatchFilter(FilterConfiguration filter) {
         return rawScanResult -> {
             FilterInput filterInput = FilterInput.getInstance(rawScanResult);
-            return filterValidator.passesFilter(filterInput, filter);
+            return filterValidator.passesFilter(filterInput, filter.getScaFilters());
         };
     }
 
