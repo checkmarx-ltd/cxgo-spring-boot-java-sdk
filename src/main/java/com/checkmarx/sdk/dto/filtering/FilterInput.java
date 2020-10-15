@@ -2,6 +2,7 @@ package com.checkmarx.sdk.dto.filtering;
 
 import com.checkmarx.sdk.dto.od.OdScanResultItem;
 import com.checkmarx.sdk.dto.od.SASTScanResult;
+import com.checkmarx.sdk.dto.od.SCAScanResult;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
@@ -15,6 +16,8 @@ import java.util.stream.Collectors;
 
 /**
  * Standardized input to {@link com.checkmarx.sdk.service.FilterValidator}, independent of specific scanner type.
+ *
+ * Some of the fields may not be initialized for a specific scanner type.
  */
 @Builder
 @Getter
@@ -36,7 +39,7 @@ public class FilterInput {
     private final String severity;
     private final String status;
     private final String state;
-
+    private final Double score;
 
     public static FilterInput getInstance(SASTScanResult mainResultInfo, OdScanResultItem additionalResultInfo) {
         return FilterInput.builder()
@@ -46,6 +49,15 @@ public class FilterInput {
                 .severity(mainResultInfo.getSeverity().getSeverity())
                 .status(mainResultInfo.getStatus().getStatus())
                 .state(getStateName(mainResultInfo))
+                .build();
+    }
+
+    public static FilterInput getInstance(SCAScanResult scaScanResult) {
+        return FilterInput.builder()
+                .id(scaScanResult.getId())
+                .cwe(scaScanResult.getCwe())
+                .severity(scaScanResult.getSeverity().getSeverity())
+                .score(scaScanResult.getScore())
                 .build();
     }
 

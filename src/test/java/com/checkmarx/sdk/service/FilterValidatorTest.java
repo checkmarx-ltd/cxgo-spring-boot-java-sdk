@@ -1,6 +1,7 @@
 package com.checkmarx.sdk.service;
 
 import com.checkmarx.sdk.dto.Filter;
+import com.checkmarx.sdk.dto.filtering.EngineFilterConfiguration;
 import com.checkmarx.sdk.dto.filtering.FilterConfiguration;
 import com.checkmarx.sdk.dto.filtering.FilterInput;
 import com.checkmarx.sdk.dto.filtering.ScriptedFilter;
@@ -9,10 +10,12 @@ import groovy.lang.GroovyRuntimeException;
 import groovy.lang.GroovyShell;
 import groovy.lang.Script;
 import lombok.extern.slf4j.Slf4j;
+import org.junit.Assert;
 import org.junit.Test;
 
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -127,12 +130,42 @@ public class FilterValidatorTest {
         verifySimpleFilterResult(filters, SEVERITY_HIGH, STATUS_NEW, STATE_URGENT_NAME, CATEGORY1, CWE2, false);
     }
 
+    @Test
+    public void passesFilter_score() {
+        verifyScoreFilter(6.12, "6.1", true);
+        verifyScoreFilter(6.12, "6.12", true);
+        verifyScoreFilter(0.01, "0.01", true);
+        verifyScoreFilter(3D, "5.7", false);
+        verifyScoreFilter(0D, "0.02", false);
+        verifyScoreFilter(null, "5.7", true);
+        verifyScoreFilter(6.1, null, true);
+        verifyScoreFilter(6.1, "I'm not a number", true);
+        verifyScoreFilter(6.1, "", true);
+    }
+
+    private void verifyScoreFilter(Double valueToCheck, String valueFromFilter, boolean shouldPass) {
+        Filter score = Filter.builder().type(Filter.Type.SCORE).value(valueFromFilter).build();
+
+        EngineFilterConfiguration scaFilterConfig = EngineFilterConfiguration.builder()
+                .simpleFilters(Collections.singletonList(score))
+                .build();
+
+        FilterInput input = FilterInput.builder().id("424").score(valueToCheck).build();
+
+        String message = String.format("Unexpected score filter result (valueToCheck: %f, valueFromFilter: %s)",
+                valueToCheck, valueFromFilter);
+
+        boolean actuallyPassed = new FilterValidator().passesFilter(input, scaFilterConfig);
+
+        Assert.assertEquals(message, shouldPass, actuallyPassed);
+    }
+
     private void validateExpectedError(String scriptWithRuntimeError) {
         Script script = parse(scriptWithRuntimeError);
 
         FilterInput finding = createFilterInput(SEVERITY_LOW, CATEGORY1, STATUS_NEW, STATE_URGENT_NAME, CWE1);
 
-        FilterConfiguration filterConfiguration = createFilterConfiguration(script);
+        EngineFilterConfiguration filterConfiguration = createFilterConfiguration(script);
         FilterValidator validator = new FilterValidator();
 
         try {
@@ -167,7 +200,7 @@ public class FilterValidatorTest {
                                            String cweId,
                                            boolean expectedResult) {
         FilterInput finding = createFilterInput(severity, category, status, state, cweId);
-        FilterConfiguration filterConfiguration = createFilterConfiguration(script);
+        EngineFilterConfiguration filterConfiguration = createFilterConfiguration(script);
 
         FilterValidator validator = new FilterValidator();
         boolean actualResult = validator.passesFilter(finding, filterConfiguration);
@@ -183,17 +216,17 @@ public class FilterValidatorTest {
                                                  boolean expectedResult) {
         FilterInput finding = createFilterInput(severity, category, status, state, cweId);
         FilterValidator filterValidator = new FilterValidator();
-        FilterConfiguration filterConfiguration = FilterConfiguration.builder().simpleFilters(filters).build();
-        boolean passes = filterValidator.passesFilter(finding, filterConfiguration);
+        FilterConfiguration filterConfiguration = FilterConfiguration.fromSimpleFilters(filters);
+        boolean passes = filterValidator.passesFilter(finding, filterConfiguration.getSastFilters());
         assertEquals(expectedResult, passes, "Unexpected simple filtering result.");
     }
 
-    private static FilterConfiguration createFilterConfiguration(Script script) {
+    private static EngineFilterConfiguration createFilterConfiguration(Script script) {
         ScriptedFilter filter = ScriptedFilter.builder()
                 .script(script)
                 .build();
 
-        return FilterConfiguration.builder()
+        return EngineFilterConfiguration.builder()
                 .scriptedFilter(filter)
                 .build();
     }

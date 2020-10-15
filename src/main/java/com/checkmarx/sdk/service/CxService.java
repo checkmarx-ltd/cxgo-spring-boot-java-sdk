@@ -356,95 +356,115 @@ public class CxService implements CxClient{
 
         List<ScanResults.XIssue> xIssues = new ArrayList<>();
         //SAST
-        List<SASTScanResult> mainFindingInfos = Optional.ofNullable(resultFromAllEngines)
+        List<SASTScanResult> mainResultInfos = Optional.ofNullable(resultFromAllEngines)
                 .map(com.checkmarx.sdk.dto.od.ScanResults::getSast)
                 .orElse(null);
 
-        if(mainFindingInfos != null){
+        if (mainResultInfos != null) {
             Map<String, OdScanResultItem> additionalResultInfos = getScanResultsPage(projectId, scanId);
-            Map<String, Integer> policyCount = new HashMap<>();
-            log.debug("SAST finding count before filtering: {}", mainFindingInfos.size());
+            Map<String, Integer> issuesBySeverity = new HashMap<>();
+            log.debug("SAST finding count before filtering: {}", mainResultInfos.size());
             log.info("Processing SAST results");
-            mainFindingInfos.stream()
-                    .filter(onlyResultsThatMatchFilter(additionalResultInfos, filter))
-                    .forEach(mainResultInfo -> handleSastIssue(xIssues, mainResultInfo, additionalResultInfos, projectId, scanId, policyCount));
-            CxScanSummary scanSummary = new CxScanSummary();
-            Map<String, Object> sast = (Map<String, Object>) scan.getEngines().get("sast");
-            if(sast != null){
-                int high = (int) sast.get("high_severities_count");
-                int med = (int) sast.get("medium_severities_count");
-                int low = (int) sast.get("low_severities_count");
-                scanSummary.setHighSeverity(high);
-                scanSummary.setMediumSeverity(med);
-                scanSummary.setLowSeverity(low);
-                scanSummary.setInfoSeverity(0); // Does not exist
-            }
+            mainResultInfos.stream()
+                    .filter(onlySastResultsThatMatchFilter(additionalResultInfos, filter))
+                    .forEach(mainResultInfo -> handleSastIssue(xIssues, mainResultInfo, additionalResultInfos, projectId, scanId, issuesBySeverity));
+            CxScanSummary scanSummary = getCxScanSummary(scan);
             Map<String, Object> flowSummary = new HashMap<>();
-            flowSummary.put(Constants.SUMMARY_KEY, policyCount);
+            flowSummary.put(Constants.SUMMARY_KEY, issuesBySeverity);
             flowSummary.put(Constants.SCAN_ID_KEY, scanId);
             results.additionalDetails(flowSummary);
             results.scanSummary(scanSummary);
         }
 
         //SCA
-        if(resultFromAllEngines.getSca() != null){
+        List<SCAScanResult> rawScanResults = Optional.ofNullable(resultFromAllEngines)
+                .map(com.checkmarx.sdk.dto.od.ScanResults::getSca).orElse(null);
+        if (rawScanResults != null) {
             List<Finding> findings = new ArrayList<>();
             List<Package> packages = new ArrayList<>();
 
             log.info("Processing SCA results");
-            resultFromAllEngines.getSca().stream()
-                    .filter( i -> filterIssue(i, filter))
-                    .forEach( i -> handleScaIssue(xIssues, findings, packages, i));
-            SCAResults scaResults = new SCAResults();
-            Summary summary = new Summary();
+            rawScanResults.stream()
+                    .filter(rawScanResult -> !rawScanResult.isIgnored())
+                    .filter(onlyScaResultsThatMatchFilter(filter))
+                    .forEach(rawScanResult -> handleScaIssue(xIssues, findings, packages, rawScanResult));
 
+            SCAResults scaResults = new SCAResults();
             scaResults.setFindings(findings);
             scaResults.setPackages(packages);
-            if (!resultFromAllEngines.getSca().isEmpty()) {
-                scaResults.setScanId(resultFromAllEngines.getSca().get(0).getScanId().toString());
+            if (!rawScanResults.isEmpty()) {
+                scaResults.setScanId(rawScanResults.get(0).getScanId().toString());
             }
-            Map<String, Object> sca = (Map<String, Object>) scan.getEngines().get("sca");
-            if(sca != null){
-                int high = (int) sca.get("high_severities_count");
-                int med = (int) sca.get("medium_severities_count");
-                int low = (int) sca.get("low_severities_count");
-                Map<Filter.Severity, Integer> severityMap = new HashMap<>();
-                severityMap.put(Filter.Severity.HIGH, high);
-                severityMap.put(Filter.Severity.MEDIUM, med);
-                severityMap.put(Filter.Severity.LOW, low);
-                severityMap.put(Filter.Severity.INFO, 0);
-                summary.setFindingCounts(severityMap);
-            }
+            Summary summary = getScaScanSummary(scan);
             scaResults.setSummary(summary);
-            String scaDeepLink = cxProperties.getPortalUrl().concat(SCA_DEEP_LINK);
-            scaDeepLink = String.format(scaDeepLink, buId, appId, projectId, scanId);
+            String urlTemplate = cxProperties.getPortalUrl().concat(SCA_DEEP_LINK);
+            String scaDeepLink = String.format(urlTemplate, buId, appId, projectId, scanId);
             scaResults.setWebReportLink(scaDeepLink);
             results.scaResults(scaResults);
-
         }
 
         results.xIssues(xIssues);
         results.projectId(projectId.toString());
-        String deepLink = cxProperties.getPortalUrl().concat(DEEP_LINK);
-        deepLink = String.format(deepLink, buId, appId, projectId, scanId);
+        String urlTemplate = cxProperties.getPortalUrl().concat(DEEP_LINK);
+        String deepLink = String.format(urlTemplate, buId, appId, projectId, scanId);
         results.link(deepLink);
 
         return results.build();
     }
 
-    private Predicate<SASTScanResult> onlyResultsThatMatchFilter(Map<String, OdScanResultItem> additionalResultInfos,
-                                                                 FilterConfiguration filter) {
+    private static Summary getScaScanSummary(Scan scanDetails) {
+        Map<String, Object> scaScanDetails = (Map<String, Object>) scanDetails.getEngines().get("sca");
+        Summary summary = new Summary();
+        Map<Filter.Severity, Integer> severityMap = new EnumMap<>(Filter.Severity.class);
+        if (scaScanDetails != null) {
+            int high = (int) scaScanDetails.get("high_severities_count");
+            int med = (int) scaScanDetails.get("medium_severities_count");
+            int low = (int) scaScanDetails.get("low_severities_count");
+            severityMap.put(Filter.Severity.HIGH, high);
+            severityMap.put(Filter.Severity.MEDIUM, med);
+            severityMap.put(Filter.Severity.LOW, low);
+            severityMap.put(Filter.Severity.INFO, 0);
+        }
+        summary.setFindingCounts(severityMap);
+        return summary;
+    }
+
+    private static CxScanSummary getCxScanSummary(Scan scanDetails) {
+        CxScanSummary scanSummary = new CxScanSummary();
+        Map<String, Object> sastScanDetails = (Map<String, Object>) scanDetails.getEngines().get("sast");
+        if (sastScanDetails != null) {
+            int high = (int) sastScanDetails.get("high_severities_count");
+            int med = (int) sastScanDetails.get("medium_severities_count");
+            int low = (int) sastScanDetails.get("low_severities_count");
+            scanSummary.setHighSeverity(high);
+            scanSummary.setMediumSeverity(med);
+            scanSummary.setLowSeverity(low);
+            scanSummary.setInfoSeverity(0); // Does not exist
+        }
+        return scanSummary;
+    }
+
+    private Predicate<SASTScanResult> onlySastResultsThatMatchFilter(Map<String, OdScanResultItem> additionalResultInfos,
+                                                                     FilterConfiguration filter) {
         return mainResultInfo -> {
             String resultId = mainResultInfo.getId().toString();
             OdScanResultItem additionalResultInfo = additionalResultInfos.get(resultId);
             FilterInput filterInput = FilterInput.getInstance(mainResultInfo, additionalResultInfo);
-            return filterValidator.passesFilter(filterInput, filter);
+            return filterValidator.passesFilter(filterInput, filter.getSastFilters());
+        };
+    }
+
+
+    private Predicate<? super SCAScanResult> onlyScaResultsThatMatchFilter(FilterConfiguration filter) {
+        return rawScanResult -> {
+            FilterInput filterInput = FilterInput.getInstance(rawScanResult);
+            return filterValidator.passesFilter(filterInput, filter.getScaFilters());
         };
     }
 
     private void handleSastIssue(List<ScanResults.XIssue> xIssues, SASTScanResult sastResult,
                                 Map<String, OdScanResultItem> scanResultItems,
-                                int projectId, int scanId, Map<String, Integer> policyCount){
+                                int projectId, int scanId, Map<String, Integer> issuesBySeverity){
         boolean newIssue = true;
         OdScanResultItem x = scanResultItems.get(sastResult.getId().toString());
         sastResult.setVulnerabilityType(x.getTitle());
@@ -466,13 +486,13 @@ public class CxService implements CxClient{
             }
         }
         else {
-            Integer count = policyCount.get(sastResult.getSeverity().getSeverity());
+            Integer count = issuesBySeverity.get(sastResult.getSeverity().getSeverity());
             if(count == null){
-                policyCount.put(sastResult.getSeverity().getSeverity(), 1);
+                issuesBySeverity.put(sastResult.getSeverity().getSeverity(), 1);
             }
             else {
                 count ++;
-                policyCount.put(sastResult.getSeverity().getSeverity(), count);
+                issuesBySeverity.put(sastResult.getSeverity().getSeverity(), count);
             }
             xIssue.setDetails(new HashMap<>());
         }
@@ -549,23 +569,6 @@ public class CxService implements CxClient{
         nodeData.put("column", node.getColumn().toString());
         nodeData.put("object", node.getName());
         return nodeData;
-    }
-
-    private boolean filterIssue(SCAScanResult result, FilterConfiguration filter){
-        List<Filter>  filters = filter.getSimpleFilters();
-        if(filters == null || filters.isEmpty() || result.isIgnored()){
-            return true;
-        }
-        for(Filter f : filters){
-            if (f.getType() == Filter.Type.SEVERITY) {
-                if (!result.getSeverity().getSeverity().equalsIgnoreCase(f.getValue())) {
-                    return false;
-                }
-            }
-            //TODO Category/CWE/Status
-        }
-        //if you passed through all filters, you made it!
-        return true;
     }
 
     private void updateIssueSummary(CxScanSummary scanSummary, OdScanResultItem vulnerability) {
