@@ -10,7 +10,7 @@
 	</parent>
 	<groupId>com.github.checkmarx-ltd</groupId>
 	<artifactId>cxgo-spring-boot-sdk</artifactId>
-	<version>0.1.42</version>
+	<version>0.1.41</version>
 	<name>cxgo-spring-boot-sdk</name>
 	<description>CxGo Java Spring Boot SDK</description>
 
