@@ -85,18 +85,25 @@ public class CxService implements CxClient{
     private static List<CxScanParams> scanProbeMap = new LinkedList<>();
 
     private final CxProperties cxProperties;
+    private final CxLegacyService cxLegacyService;
     private final CxAuthClient authClient;
     private final RestTemplate restTemplate;
     private final Map<String, Object> codeCache = new HashMap<>();
     private CxRepoFileService cxRepoFileService;
+    private final ScanSettingsClient scanSettingsClient;
     private final FilterValidator filterValidator;
 
-    public CxService(CxProperties cxProperties, CxAuthClient authClient,
+    public CxService(CxAuthClient authClient,
+                CxProperties cxProperties,
+                     CxLegacyService cxLegacyService,
                      @Qualifier("cxRestTemplate") RestTemplate restTemplate,
+                     ScanSettingsClient scanSettingsClient,
                      FilterValidator filterValidator) {
         this.cxProperties = cxProperties;
         this.authClient = authClient;
         this.restTemplate = restTemplate;
+        this.cxLegacyService = cxLegacyService;
+        this.scanSettingsClient = scanSettingsClient;
         this.filterValidator = filterValidator;
     }
 
@@ -1042,7 +1049,7 @@ public class CxService implements CxClient{
     }
 
     @Override
-    public Integer createScanSetting(Integer projectId, Integer presetId, Integer engineConfigId) {
+    public Integer createScanSetting(Integer projectId, Integer presetId, Integer engineConfigId, Integer postActionId) {
         return null;
     }
 
