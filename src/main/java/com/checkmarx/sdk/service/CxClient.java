@@ -178,7 +178,7 @@ public interface CxClient {
      * @param engineConfigId
      * @return ID for scan settings
      */
-    public Integer createScanSetting(Integer projectId, Integer presetId, Integer engineConfigId);
+    public Integer createScanSetting(Integer projectId, Integer presetId, Integer engineConfigId, Integer postActionId);
 
     /**
      * Get Scan Settings for an existing project (JSON String)

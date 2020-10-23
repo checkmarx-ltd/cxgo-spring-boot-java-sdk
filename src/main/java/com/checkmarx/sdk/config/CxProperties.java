@@ -58,6 +58,8 @@ public class CxProperties {
     private List<String> engineTypes = Arrays.asList("SAST", "SCA");
     private String postCloneScript;
     private Boolean enableShardManager = false;
+    private Boolean enablePostActionMonitor = false;
+    private Integer postActionPostbackId = 0;
 
     // TODO:, JeffA this needs to be removed.
     private String portalPackage = "checkmarx.wsdl.portal";
@@ -403,8 +405,24 @@ public class CxProperties {
         this.postCloneScript = postCloneScript;
     }
 
+    public boolean getEnablePostActionMonitor() {
+        return this.enablePostActionMonitor;
+    }
+
+    public Integer getPostActionPostbackId() {
+        return this.postActionPostbackId;
+    }
+
     public Boolean getEnableShardManager() {
         return enableShardManager;
+    }
+
+    public void setEnablePostActionMonitor(boolean enablePostActionMonitor) {
+        this.enablePostActionMonitor = enablePostActionMonitor;
+    }
+
+    public void setPostActionPostbackId(Integer postActionPostbackId) {
+        this.postActionPostbackId = postActionPostbackId;
     }
 
     public void setEnableShardManager(Boolean enableShardManager) {
