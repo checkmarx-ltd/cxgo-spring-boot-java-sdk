@@ -102,6 +102,7 @@ public class CxService implements CxClient{
         this.cxProperties = cxProperties;
         this.authClient = authClient;
         this.restTemplate = restTemplate;
+
         this.cxLegacyService = cxLegacyService;
         this.scanSettingsClient = scanSettingsClient;
         this.filterValidator = filterValidator;
