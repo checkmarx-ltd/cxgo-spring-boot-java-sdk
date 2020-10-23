@@ -15,13 +15,8 @@ import java.util.List;
 @Component
 public class CxLegacyService {
     private static final Logger log = org.slf4j.LoggerFactory.getLogger(CxLegacyService.class);
-    private final CxProperties properties;
-    private final WebServiceTemplate ws;
-    private final ShardSessionTracker sessionTracker;
 
-    public CxLegacyService(CxProperties properties, WebServiceTemplate ws, ShardSessionTracker sessionTracker) {
-        this.properties = properties;
-        this.ws = ws;
-        this.sessionTracker = sessionTracker;
+    public CxLegacyService() {
+
     }
 }
